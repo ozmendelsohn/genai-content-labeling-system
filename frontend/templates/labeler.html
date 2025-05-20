@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Label Website</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { display: flex; width: 100%; max-width: 1600px; gap: 20px; }
+        .iframe-container { flex-grow: 1; height: 80vh; /* Default to 80% of viewport height */ }
+        iframe { width: 100%; height: 100%; border: 1px solid #ccc; }
+        .form-container { width: 450px; /* Fixed width for the form and checklists */ display: flex; flex-direction: column; gap: 15px; }
+        .form-section { border: 1px solid #eee; padding: 15px; border-radius: 5px; background-color: #f9f9f9; }
+        .form-section h3 { margin-top: 0; }
+        .form-section label { display: block; margin-bottom: 5px; }
+        .form-section input[type="text"], .form-section textarea { width: calc(100% - 22px); padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 3px; }
+        .form-section input[type="radio"] { margin-right: 5px; }
+        .form-section button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .form-section button:hover { background-color: #0056b3; }
+        .checklist { list-style-type: none; padding-left: 0; }
+        .checklist li { margin-bottom: 8px; }
+        .checklist input[type="checkbox"] { margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Label Website Task</h1>
+    <p>User ID: {{ user_id }}, Website ID: {{ website_id }}</p>
+
+    <div class="container">
+        <div class="iframe-container">
+            <iframe src="{{ website_url }}" title="Website to label"></iframe>
+        </div>
+
+        <div class="form-container">
+            <form action="/labeler/submit_label" method="post" class="form-section">
+                <h3>Submit Your Label</h3>
+                <input type="hidden" name="website_id" value="{{ website_id }}">
+                <input type="hidden" name="user_id" value="{{ user_id }}">
+                <input type="hidden" name="task_start_time" value="{{ task_start_time }}">
+
+                <div>
+                    <label><strong>Label:</strong></label>
+                    <input type="radio" id="genai" name="label_value" value="GenAI" required>
+                    <label for="genai">GenAI</label><br>
+                    <input type="radio" id="not_genai" name="label_value" value="Not GenAI">
+                    <label for="not_genai">Not GenAI</label>
+                </div>
+                <br>
+                <div>
+                    <label for="tags_str"><strong>Tags (comma-separated):</strong></label>
+                    <input type="text" id="tags_str" name="tags_str">
+                </div>
+                <br>
+                <button type="submit">Submit Label</button>
+            </form>
+
+            <div class="form-section">
+                <h3>Indicators of AI-Generated or Low-Quality Websites:</h3>
+                <ul class="checklist">
+                    <li><input type="checkbox" id="ind_ads"> <label for="ind_ads">Superficial Content with Excessive Ads</label></li>
+                    <li><input type="checkbox" id="ind_generic_style"> <label for="ind_generic_style">Generic Writing Style</label></li>
+                    <li><input type="checkbox" id="ind_broken_links"> <label for="ind_broken_links">Broken or Misleading Links</label></li>
+                    <li><input type="checkbox" id="ind_image_anomalies"> <label for="ind_image_anomalies">Anomalies in Images</label></li>
+                    <li><input type="checkbox" id="ind_unverifiable_author"> <label for="ind_unverifiable_author">Unverifiable or Fabricated Author Information</label></li>
+                    <li><input type="checkbox" id="ind_inconsistent_branding"> <label for="ind_inconsistent_branding">Inconsistent Domain and Branding</label></li>
+                    <li><input type="checkbox" id="ind_no_engagement"> <label for="ind_no_engagement">Lack of Engagement Indicators</label></li>
+                    <li><input type="checkbox" id="ind_poor_organization"> <label for="ind_poor_organization">Poor Content Organization</label></li>
+                    <li><input type="checkbox" id="ind_seo_overuse"> <label for="ind_seo_overuse">Overuse of SEO Keywords</label></li>
+                    <li><input type="checkbox" id="ind_auto_customer_interaction"> <label for="ind_auto_customer_interaction">Automated Customer Interactions</label></li>
+                    <li><input type="checkbox" id="ind_ai_assisted_mention"> <label for="ind_ai_assisted_mention">Explicitly mentioning that the content creation was ‘AI-assisted’</label></li>
+                    <li><input type="checkbox" id="ind_structured_formulaic"> <label for="ind_structured_formulaic">Structured & Formulaic</label></li>
+                    <li><input type="checkbox" id="ind_same_structure_multiple"> <label for="ind_same_structure_multiple">Same Structure & Formula across multiple pages</label></li>
+                    <li><input type="checkbox" id="ind_standard_faq"> <label for="ind_standard_faq">Standard FAQ</label></li>
+                    <li><input type="checkbox" id="ind_excessive_author_articles"> <label for="ind_excessive_author_articles">Author has authored excessive number of articles</label></li>
+                    <li><input type="checkbox" id="ind_suspicious_about_page"> <label for="ind_suspicious_about_page">About page of the domain is suspicious</label></li>
+                    <li><input type="checkbox" id="ind_uncategorized"> <label for="ind_uncategorized">‘uncategorized’ as page category</label></li>
+                    <li><input type="checkbox" id="ind_same_image_multiple_articles"> <label for="ind_same_image_multiple_articles">The same image used for multiple articles</label></li>
+                    <li><input type="checkbox" id="ind_similar_content_multiple_articles"> <label for="ind_similar_content_multiple_articles">Multiple articles with the extremely similar content</label></li>
+                </ul>
+            </div>
+
+            <div class="form-section">
+                <h3>Signs of Authentic, Human-Created Websites:</h3>
+                <ul class="checklist">
+                    <li><input type="checkbox" id="auth_depth_originality"> <label for="auth_depth_originality">Depth and Originality in Content</label></li>
+                    <li><input type="checkbox" id="auth_transparent_author"> <label for="auth_transparent_author">Transparent Author Credentials</label></li>
+                    <li><input type="checkbox" id="auth_consistent_design"> <label for="auth_consistent_design">Consistent and Professional Design</label></li>
+                    <li><input type="checkbox" id="auth_active_community"> <label for="auth_active_community">Active Community Engagement</label></li>
+                    <li><input type="checkbox" id="auth_functional_links"> <label for="auth_functional_links">Functional and Relevant Links</label></li>
+                    <li><input type="checkbox" id="auth_regularly_updated"> <label for="auth_regularly_updated">Regularly Updated Content</label></li>
+                    <li><input type="checkbox" id="auth_clear_contact"> <label for="auth_clear_contact">Clear Contact Information</label></li>
+                    <li><input type="checkbox" id="auth_editorial_standards"> <label for="auth_editorial_standards">Editorial Standards and Disclaimers</label></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

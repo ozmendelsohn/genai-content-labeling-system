@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy
+pydantic[email]
+jinja2
+pytest
+httpx
+python-multipart
