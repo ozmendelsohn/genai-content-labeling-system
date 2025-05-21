@@ -2,7 +2,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, T
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from .database import Base
+from database import Base # Changed from .database to database
 
 class User(Base):
     __tablename__ = "users"
@@ -52,4 +52,4 @@ class Tag(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
 
-    labels = relationship("Label", secondary=label_tag_association, back_populates="tags")
+    labels = relationship("Label", secondary=label_tag_association, back_populates="tags") 

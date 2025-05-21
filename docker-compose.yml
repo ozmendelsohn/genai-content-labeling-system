@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./content_detector.db:/app/content_detector.db
+      # Optional: Mount scripts directory if you want to easily run init_db.py manually via exec
+      - ./scripts:/app/scripts
+      - ./frontend/templates:/app/templates # Mount frontend templates for backend to use
+    environment:
+      # Ensure the FastAPI app inside the container knows where to find the database
+      # The database.py uses sqlite:///./content_detector.db, which means it expects it in the WORKDIR (/app)
+      DATABASE_URL: sqlite:///./content_detector.db
+    # The command can be overridden here if needed, but it's already in the Dockerfile.
+    # We might add a command to run init_db.py on first startup if the db file doesn't exist.
+    # For now, manual execution of init_db.py via `docker-compose exec` will be documented.
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules 
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      # This ensures that hot-reloading works with Docker
+      - WATCHPACK_POLLING=true
+    # command: npm run dev # You might need to adjust this based on your package.json
+
+# Optional: Define a named volume for the database if you prefer it over host mounting
+# volumes:
+#   content_detector_db:

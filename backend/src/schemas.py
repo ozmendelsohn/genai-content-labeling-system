@@ -14,6 +14,7 @@ class Tag(TagBase):
 
     class Config:
         orm_mode = True
+        # from_attributes = True # For Pydantic v2
 
 # Website Schemas
 class WebsiteBase(BaseModel):
@@ -30,6 +31,7 @@ class Website(WebsiteBase):
 
     class Config:
         orm_mode = True
+        # from_attributes = True
 
 # Label Schemas
 class LabelBase(BaseModel):
@@ -39,7 +41,7 @@ class LabelBase(BaseModel):
 class LabelCreate(LabelBase):
     website_id: int
     user_id: int
-    tags: Optional[List[int]] = [] # List of Tag IDs
+    tags: Optional[List[int]] = []
 
 class Label(LabelBase):
     id: int
@@ -47,10 +49,10 @@ class Label(LabelBase):
     user_id: int
     created_at: datetime
     tags: List[Tag] = []
-    # time_spent_seconds is already in LabelBase, so it's inherited here
 
     class Config:
         orm_mode = True
+        # from_attributes = True
 
 # User Schemas
 class UserBase(BaseModel):
@@ -62,7 +64,8 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    labels: List[Label] = []
+    # labels: List[Label] = [] # Consider if needed, due to potential circular deps
 
     class Config:
         orm_mode = True
+        # from_attributes = True 
