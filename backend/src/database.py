@@ -6,15 +6,43 @@ session management for the application.
 """
 
 import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Database URL from environment variable or default to SQLite
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "sqlite:///./genai_labeling.db"
 )
+
+def ensure_database_directory():
+    """
+    Ensure the database directory exists for SQLite databases
+    """
+    if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+        # Extract file path from SQLite URL
+        db_path = SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")
+        
+        # Handle relative vs absolute paths
+        if not os.path.isabs(db_path):
+            # For relative paths, ensure they're relative to the app directory
+            db_path = os.path.join(os.getcwd(), db_path)
+        
+        # Create directory if it doesn't exist
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            logger.info(f"📁 Created database directory: {db_dir}")
+        
+        logger.info(f"💾 Database will be created at: {db_path}")
+
+# Ensure database directory exists before creating engine
+ensure_database_directory()
 
 # Create engine
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):

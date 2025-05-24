@@ -6,11 +6,12 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./scripts:/app/scripts
-      - ./genai_labeling.db:/app/genai_labeling.db
+      - ./data:/app/data
       - ./frontend/templates:/app/templates
       - ./config.yaml:/app/config.yaml
     environment:
       - PYTHONPATH=/app/src
+      - DATABASE_URL=sqlite:///./data/genai_labeling.db
 
   frontend:
     build: ./frontend

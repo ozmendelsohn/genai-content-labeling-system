@@ -5,19 +5,23 @@ This is the main FastAPI application that provides REST API endpoints
 for user management, authentication, content management, and labeling.
 """
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
+import csv
+import io
 from datetime import datetime, timedelta
 import asyncio
+import os
+import logging
 
 # Import local modules
-from database import get_db, engine
-from models import User, ContentItem, Label, UserRole, ContentStatus, LabelClassification
+from database import get_db, engine, create_tables
+from models import User, ContentItem, Label, UserRole, ContentStatus, LabelClassification, Base
 from sqlalchemy import or_
 from schemas import (
     UserCreate, UserResponse, UserUpdate, UserPasswordUpdate, UserListResponse,
@@ -36,6 +40,28 @@ from auth import (
 )
 from ai_service import create_ai_analyzer
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def initialize_database():
+    """
+    Initialize database with tables and default admin user if needed
+    """
+    try:
+        logger.info("🚀 Initializing database...")
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+
+        
+        logger.info("🎉 Database initialization completed!")
+        
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        # Don't exit - let the application try to continue
+        logger.warning("⚠️  Application will continue but may have issues")
+
 # Create FastAPI app
 app = FastAPI(
     title="GenAI Content Labeling System",
@@ -44,6 +70,12 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and other startup tasks"""
+    initialize_database()
 
 # Configure CORS
 app.add_middleware(
@@ -633,6 +665,300 @@ async def get_dashboard_data(
         system_stats=system_stats,
         recent_activity=recent_activity
     )
+
+@app.get("/admin/labeling-analytics")
+async def get_labeling_analytics(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive labeling analytics for admin dashboard
+    
+    Args:
+        current_user: Current authenticated admin user
+        db: Database session
+        
+    Returns:
+        Dict: Comprehensive labeling analytics including AI vs Human classification stats,
+              labeler performance, time metrics, and trends
+    """
+    from sqlalchemy import func, case, extract
+    
+    # Classification Distribution
+    classification_stats = db.query(
+        Label.classification,
+        func.count(Label.id).label('count'),
+        func.avg(Label.confidence_score).label('avg_confidence'),
+        func.avg(Label.time_spent_seconds).label('avg_time_spent')
+    ).group_by(Label.classification).all()
+    
+    # Process classification data
+    ai_generated_count = 0
+    human_created_count = 0
+    uncertain_count = 0
+    ai_avg_confidence = 0
+    human_avg_confidence = 0
+    ai_avg_time = 0
+    human_avg_time = 0
+    
+    for stat in classification_stats:
+        if stat.classification == LabelClassification.AI_GENERATED:
+            ai_generated_count = stat.count
+            ai_avg_confidence = round(stat.avg_confidence or 0, 1)
+            ai_avg_time = round(stat.avg_time_spent or 0, 1)
+        elif stat.classification == LabelClassification.HUMAN_CREATED:
+            human_created_count = stat.count
+            human_avg_confidence = round(stat.avg_confidence or 0, 1)
+            human_avg_time = round(stat.avg_time_spent or 0, 1)
+        elif stat.classification == LabelClassification.UNCERTAIN:
+            uncertain_count = stat.count
+    
+    total_labels = ai_generated_count + human_created_count + uncertain_count
+    
+    # Labeler Performance Stats
+    labeler_stats = db.query(
+        User.username,
+        User.full_name,
+        func.count(Label.id).label('total_labels'),
+        func.sum(case((Label.created_at >= datetime.utcnow().date(), 1), else_=0)).label('labels_today'),
+        func.avg(Label.time_spent_seconds).label('avg_time_per_label'),
+        func.sum(Label.time_spent_seconds).label('total_time_spent'),
+        func.avg(Label.confidence_score).label('avg_confidence')
+    ).join(Label, User.id == Label.labeler_id).filter(
+        User.role == UserRole.LABELER
+    ).group_by(User.id, User.username, User.full_name).all()
+    
+    # Time-based trends (last 7 days)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    daily_trends = db.query(
+        func.date(Label.created_at).label('date'),
+        func.count(Label.id).label('total_labels'),
+        func.sum(case((Label.classification == LabelClassification.AI_GENERATED, 1), else_=0)).label('ai_labels'),
+        func.sum(case((Label.classification == LabelClassification.HUMAN_CREATED, 1), else_=0)).label('human_labels'),
+        func.avg(Label.time_spent_seconds).label('avg_time')
+    ).filter(
+        Label.created_at >= seven_days_ago
+    ).group_by(func.date(Label.created_at)).order_by(func.date(Label.created_at)).all()
+    
+    # Quality metrics
+    today = datetime.utcnow().date()
+    quality_stats = db.query(
+        func.count(Label.id).label('total_today'),
+        func.avg(Label.time_spent_seconds).label('avg_time_today'),
+        func.sum(case((Label.time_spent_seconds < 30, 1), else_=0)).label('quick_labels'),
+        func.sum(case((Label.time_spent_seconds > 300, 1), else_=0)).label('thorough_labels')
+    ).filter(Label.created_at >= today).first()
+    
+    # Format results
+    classification_data = {
+        'ai_generated': {
+            'count': ai_generated_count,
+            'percentage': round((ai_generated_count / total_labels * 100) if total_labels > 0 else 0, 1),
+            'avg_confidence': ai_avg_confidence,
+            'avg_time_seconds': ai_avg_time
+        },
+        'human_created': {
+            'count': human_created_count,
+            'percentage': round((human_created_count / total_labels * 100) if total_labels > 0 else 0, 1),
+            'avg_confidence': human_avg_confidence,
+            'avg_time_seconds': human_avg_time
+        },
+        'uncertain': {
+            'count': uncertain_count,
+            'percentage': round((uncertain_count / total_labels * 100) if total_labels > 0 else 0, 1)
+        },
+        'total': total_labels
+    }
+    
+    labeler_performance = []
+    for labeler in labeler_stats:
+        labeler_performance.append({
+            'username': labeler.username,
+            'full_name': labeler.full_name or labeler.username,
+            'total_labels': labeler.total_labels,
+            'labels_today': labeler.labels_today,
+            'avg_time_per_label_seconds': round(labeler.avg_time_per_label or 0, 1),
+            'avg_time_per_label_minutes': round((labeler.avg_time_per_label or 0) / 60, 1),
+            'total_time_spent_hours': round((labeler.total_time_spent or 0) / 3600, 1),
+            'avg_confidence': round(labeler.avg_confidence or 0, 1),
+            'productivity_score': round(labeler.total_labels / max(1, (labeler.total_time_spent or 1) / 3600), 1)
+        })
+    
+    # Sort by total labels
+    labeler_performance.sort(key=lambda x: x['total_labels'], reverse=True)
+    
+    trends = []
+    for trend in daily_trends:
+        trends.append({
+            'date': str(trend.date),
+            'total_labels': trend.total_labels,
+            'ai_labels': trend.ai_labels,
+            'human_labels': trend.human_labels,
+            'avg_time_seconds': round(trend.avg_time or 0, 1)
+        })
+    
+    quality_metrics = {
+        'labels_today': quality_stats.total_today if quality_stats else 0,
+        'avg_time_today_seconds': round(quality_stats.avg_time_today or 0, 1) if quality_stats else 0,
+        'avg_time_today_minutes': round((quality_stats.avg_time_today or 0) / 60, 1) if quality_stats else 0,
+        'quick_labels_count': quality_stats.quick_labels if quality_stats else 0,
+        'thorough_labels_count': quality_stats.thorough_labels if quality_stats else 0,
+        'quick_labels_percentage': round((quality_stats.quick_labels / max(1, quality_stats.total_today) * 100) if quality_stats and quality_stats.total_today > 0 else 0, 1),
+        'thorough_labels_percentage': round((quality_stats.thorough_labels / max(1, quality_stats.total_today) * 100) if quality_stats and quality_stats.total_today > 0 else 0, 1)
+    }
+    
+    return {
+        'classification_distribution': classification_data,
+        'labeler_performance': labeler_performance,
+        'daily_trends': trends,
+        'quality_metrics': quality_metrics,
+        'summary': {
+            'total_labelers': len(labeler_performance),
+            'most_productive_labeler': labeler_performance[0]['username'] if labeler_performance else None,
+            'avg_time_per_label_system': round(sum(l['avg_time_per_label_seconds'] for l in labeler_performance) / max(1, len(labeler_performance)), 1),
+            'ai_human_ratio': round(ai_generated_count / max(1, human_created_count), 2) if human_created_count > 0 else float('inf')
+        }
+    }
+
+@app.get("/admin/export-data")
+async def export_dashboard_data(
+    format: str = "csv",
+    data_type: str = "urls",
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Export dashboard data in CSV or JSON format
+    
+    Args:
+        format: Export format ('csv' or 'json')
+        data_type: Type of data to export ('urls', 'labels', 'performance')
+        current_user: Current authenticated admin user
+        db: Database session
+        
+    Returns:
+        Response: File download response with exported data
+    """
+    if format not in ['csv', 'json']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format must be 'csv' or 'json'"
+        )
+    
+    if data_type not in ['urls', 'labels', 'performance']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data type must be 'urls', 'labels', or 'performance'"
+        )
+    
+    try:
+        if data_type == 'urls':
+            # Export content items
+            content_items = db.query(ContentItem).all()
+            data = []
+            for item in content_items:
+                data.append({
+                    'id': item.id,
+                    'url': item.url,
+                    'title': item.title or '',
+                    'description': item.description or '',
+                    'status': item.status.value,
+                    'priority': item.priority,
+                    'assigned_user': item.assigned_user.username if item.assigned_user else '',
+                    'created_at': item.created_at.isoformat(),
+                    'updated_at': item.updated_at.isoformat(),
+                    'completed_at': item.completed_at.isoformat() if item.completed_at else ''
+                })
+        
+        elif data_type == 'labels':
+            # Export labeling data
+            labels = db.query(Label).join(ContentItem).join(User).all()
+            data = []
+            for label in labels:
+                data.append({
+                    'label_id': label.id,
+                    'url': label.content_item.url,
+                    'title': label.content_item.title or '',
+                    'labeler': label.labeler.username,
+                    'classification': label.classification.value,
+                    'confidence_score': label.confidence_score,
+                    'time_spent_seconds': label.time_spent_seconds,
+                    'time_spent_minutes': round(label.time_spent_seconds / 60, 1),
+                    'ai_indicators': label.ai_indicators or '',
+                    'human_indicators': label.human_indicators or '',
+                    'custom_tags': label.custom_tags or '',
+                    'notes': label.notes or '',
+                    'created_at': label.created_at.isoformat(),
+                    'review_status': label.review_status
+                })
+        
+        elif data_type == 'performance':
+            # Export labeler performance data
+            from sqlalchemy import func
+            labeler_stats = db.query(
+                User.username,
+                User.full_name,
+                func.count(Label.id).label('total_labels'),
+                func.avg(Label.time_spent_seconds).label('avg_time_per_label'),
+                func.sum(Label.time_spent_seconds).label('total_time_spent'),
+                func.avg(Label.confidence_score).label('avg_confidence'),
+                func.count(func.distinct(func.date(Label.created_at))).label('active_days')
+            ).join(Label, User.id == Label.labeler_id).filter(
+                User.role == UserRole.LABELER
+            ).group_by(User.id, User.username, User.full_name).all()
+            
+            data = []
+            for labeler in labeler_stats:
+                data.append({
+                    'username': labeler.username,
+                    'full_name': labeler.full_name or '',
+                    'total_labels': labeler.total_labels,
+                    'avg_time_per_label_seconds': round(labeler.avg_time_per_label or 0, 1),
+                    'avg_time_per_label_minutes': round((labeler.avg_time_per_label or 0) / 60, 1),
+                    'total_time_spent_hours': round((labeler.total_time_spent or 0) / 3600, 1),
+                    'avg_confidence': round(labeler.avg_confidence or 0, 1),
+                    'active_days': labeler.active_days,
+                    'productivity_score': round(labeler.total_labels / max(1, (labeler.total_time_spent or 1) / 3600), 1)
+                })
+        
+        # Generate response based on format
+        if format == 'csv':
+            output = io.StringIO()
+            if data:
+                writer = csv.DictWriter(output, fieldnames=data[0].keys())
+                writer.writeheader()
+                writer.writerows(data)
+            
+            csv_content = output.getvalue()
+            output.close()
+            
+            filename = f"{data_type}_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            return Response(
+                content=csv_content,
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        
+        else:  # JSON format
+            filename = f"{data_type}_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            return Response(
+                content=json.dumps({
+                    'export_timestamp': datetime.utcnow().isoformat(),
+                    'data_type': data_type,
+                    'total_records': len(data),
+                    'data': data
+                }, indent=2),
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Export failed: {str(e)}"
+        )
 
 # AI Integration Endpoints
 @app.post("/ai/api-key", response_model=GeminiAPIKeyResponse)

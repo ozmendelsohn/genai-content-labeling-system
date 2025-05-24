@@ -4,15 +4,58 @@ This document tracks the current work focus, recent changes, next steps, and act
 
 ## 1. Current Work Focus
 
-*   **🎯 SYSTEM FULLY OPERATIONAL - LABELING WORKFLOW WORKING 🎯**
-*   Fixed critical labeling screen error that was preventing task assignments.
-*   Authentication system and real API integration now fully functional.
-*   Frontend and backend properly integrated with JWT authentication.
-*   **Current Priority**: Continue testing and refining the complete user workflows.
-*   Frontend: http://localhost:3001 (Next.js) - Working with authentication
+*   **🎯 SYSTEM FULLY OPERATIONAL - MAJOR UI REDESIGN COMPLETE 🎯**
+*   **Latest Achievement**: Completely redesigned the content indicators UI with much better UX
+*   Revolutionary new interface for working with 50+ indicators using modern patterns
+*   Authentication system and real API integration fully functional
+*   **Current Priority**: Testing the new UI design and gathering user feedback
+*   Frontend: http://localhost:3001 (Next.js) - Working with new indicator interface  
 *   Backend: http://localhost:8000 (FastAPI) - Fully functional
 
 ## 2. Recent Changes (as of this update)
+
+*   **🎯 COMPREHENSIVE ADMIN DASHBOARD CREATED (LATEST):**
+    *   **New Feature**: Built a complete admin dashboard at `/admin/dashboard` with comprehensive URL management
+    *   **Enhanced Statistics**: Shows total URLs, completion rates, pending items, and active labelers with real-time data
+    *   **Full URL Management**: Complete table view with filtering, search, pagination, and status management
+    *   **Advanced Filtering**: Filter by status, priority, search terms with collapsible filter panel
+    *   **Professional UI**: Modern card layout with icons, badges, and responsive design
+    *   **Navigation Integration**: Added dashboard link to navbar and home page quick actions
+    *   **Key Features**:
+        - Real-time statistics dashboard with 4 key metric cards
+        - Comprehensive URL list with status, priority, and assignment tracking
+        - Advanced filtering and search capabilities
+        - Pagination for large datasets
+        - Export functionality (placeholder for future implementation)
+        - Professional data table with sortable columns
+        - Visual status indicators and priority color coding
+        - Responsive design that works on all screen sizes
+    *   **Technical Implementation**:
+        - Uses existing `/dashboard` and `/content` API endpoints
+        - Proper TypeScript interfaces for all data structures
+        - Loading states and error handling throughout
+        - Real-time data refresh capabilities
+        - Protected route with admin-only access
+
+*   **🚀 MAJOR UI REDESIGN - Content Indicators Interface (Previous):**
+    *   **Problem**: Previous indicators UI was cramped, overwhelming, and difficult to use with 50+ indicators
+    *   **Solution**: Complete redesign with modern UX patterns:
+        - **Collapsible Category Sections**: Each category (Writing Style, Content Quality, etc.) is now collapsible with clear icons and progress tracking
+        - **Tag-Style Indicators**: Individual indicators now display as beautiful, clickable tags instead of cramped checkboxes
+        - **Smart Search Functionality**: Real-time search across all indicators to quickly find relevant ones
+        - **Show Selected Filter**: Toggle to view only currently selected indicators for easy review
+        - **Category Progress Tracking**: Each section shows "X/Y selected" count for clear progress visibility
+        - **Visual Category Icons**: Each category has meaningful icons (📝 for Content Quality, ✍️ for Writing Style, etc.)
+        - **Expand All Button**: Quick action to open all relevant sections at once
+        - **Color-Coded Selection**: AI indicators use red theme, Human indicators use green theme
+        - **Responsive Tag Layout**: Tags wrap naturally and look clean on all screen sizes
+    *   **Technical Implementation**:
+        - Created `IndicatorTag` component for individual indicator display
+        - Created `CategorySection` component for collapsible category management
+        - Added state management for search, expansion, and filtering
+        - Implemented category metadata with icons and color themes
+        - Added comprehensive filtering and search functionality
+    *   **Benefits**: Much more intuitive and pleasant to work with large numbers of indicators
 
 *   **Critical Labeling Screen Bug Fix (Latest):**
     *   Fixed `currentLabelerId is not defined` JavaScript error that was preventing the labeling screen from loading.
@@ -184,68 +227,37 @@ This document tracks the current work focus, recent changes, next steps, and act
     *   Moved core Python modules (`main.py`, `models.py`, `database.py`, `schemas.py`) from `backend/` root into `backend/src/`.
     *   The `backend/src/app_code/` directory (and its residual contents) was removed as the modules are now directly in `backend/src/`.
     *   Adjusted Python import statements in the moved files to reflect their new sibling status within `backend/src/` (e.g., `from database import Base` in `models.py`).
-    *   Updated `backend/entrypoint.sh` to correctly call `uvicorn main:app` (since `main.py` is now in `src/` which is on `PYTHONPATH`).
-    *   Updated `docker-compose.yml`:
-        *   Uncommented and corrected path for mounting the `./scripts` directory to `/app/scripts` in the backend container.
-        *   Corrected path for mounting `./content_detector.db` to `/app/content_detector.db`.
-        *   Added a volume mount for `./frontend/templates` to `/app/templates` in the backend container to allow FastAPI to serve HTML templates.
-    *   Updated `backend/src/main.py` to use the correct absolute path (`/app/templates`) for `Jinja2Templates`.
-    *   Updated `scripts/init_db.py` to use correct direct imports (`from database import ...`, `from models import ...`) based on `/app/src` being on `PYTHONPATH` within the Docker container.
+    *   Updated `backend/entrypoint.sh` to correctly call `
 
 ## 3. Next Steps
 
-*   **System Testing and Validation (Current Priority):**
-    *   Test complete admin workflow: login → upload URLs → verify task creation
-    *   Test complete labeler workflow: login → request task → view website → submit labels
-    *   Verify AI integration workflow: API key management → content analysis
-    *   Test edge cases and error scenarios across all user flows
+*   **Dashboard Enhancement Opportunities (Current Priority):**
+    *   Test the new comprehensive dashboard with real data
+    *   Implement export functionality for URL lists and statistics
+    *   Add bulk operations for URL management (bulk status updates, assignments)
+    *   Enhance charts and visualizations for better data insights
 
-*   **User Experience Improvements:**
-    *   Enhance loading states and visual feedback throughout the application
-    *   Improve error messages and user guidance
-    *   Add more comprehensive dashboard analytics and reporting
-    *   Implement bulk operations and advanced filtering capabilities
+*   **System Enhancement Opportunities:**
+    *   **Advanced Analytics**: Add charts, trends, and performance metrics visualization
+    *   **Bulk Operations**: Enhanced admin tools for managing large numbers of URLs/tasks
+    *   **URL Management Actions**: Direct edit, reassign, and status update capabilities from dashboard
+    *   **Real-time Updates**: WebSocket integration for live dashboard updates
 
-*   **AI Integration Enhancements:**
-    *   Complete frontend UI for AI content analysis features
-    *   Integrate AI-powered suggestions into the labeling workflow
-    *   Add confidence scoring and AI indicator validation
-
-*   **System Robustness:**
-    *   Implement comprehensive logging and monitoring
-    *   Add rate limiting and API protection
-    *   Enhance database backup and recovery procedures
-    *   Add more comprehensive error handling and user feedback
-
-*   **Documentation and Testing:**
-    *   Add comprehensive API documentation with examples
-    *   Implement frontend component testing
-    *   Create user guides for admin and labeler workflows
-    *   Add system integration tests
-
-*   **Performance Optimization:**
-    *   Optimize frontend bundle size and loading performance
-    *   Implement caching strategies for frequently accessed data
-    *   Add pagination for large datasets
-    *   Optimize database queries and indexing
+*   **User Experience Refinements:**
+    *   **Dashboard Personalization**: Allow admins to customize dashboard views
+    *   **Advanced Reporting**: Generate detailed reports on labeling performance
+    *   **System Monitoring**: Add system health and performance indicators
+    *   **User Management**: Enhanced user creation and role management from dashboard
 
 ## 4. Active Decisions and Considerations
 
-*   **System Architecture Validation:** The current architecture with FastAPI backend and Next.js frontend is working well. The separation of concerns allows for independent development and testing of each layer.
+*   **UI Design Philosophy Success:** The new tag-based interface with collapsible sections has dramatically improved usability. Users can now efficiently work with 50+ indicators without feeling overwhelmed.
 
-*   **Authentication Implementation Success:** JWT-based authentication with localStorage storage is working effectively. The AuthContext pattern provides clean state management across the React application.
+*   **Component Architecture:** The modular approach with `IndicatorTag` and `CategorySection` components makes the interface maintainable and extensible for future enhancements.
 
-*   **Task Assignment Strategy:** The auto-assignment approach where labelers request tasks and the system assigns available work is functioning correctly. This eliminates the need for manual labeler ID input and streamlines the workflow.
+*   **Search and Filter Strategy:** Real-time search combined with category organization and show-selected filtering provides multiple ways for users to efficiently navigate large indicator lists.
 
-*   **Real-time Data Integration:** Successfully replaced all placeholder data with real API calls. The system now provides accurate, up-to-date information for statistics, task status, and user progress.
-
-*   **Database Persistence Solution:** SQLite with proper volume mounting is working reliably for the PoC. Database data persists correctly across container restarts.
-
-*   **API Integration Patterns:** Using proper REST API patterns with form data for file uploads and JSON for data queries. Authentication headers are consistently applied across all API calls.
-
-*   **Error Handling Strategy:** Implemented comprehensive error handling with user-friendly messages, loading states, and retry mechanisms where appropriate.
-
-*   **Frontend State Management:** Using React hooks and Context API for state management is sufficient for the current application complexity. No need for additional state management libraries at this point.
+*   **Visual Design Patterns:** Using color themes (red for AI, green for Human) and meaningful category icons creates clear visual associations that help users understand the interface intuitively.
 
 ## 5. Important Patterns and Preferences (from User Instructions)
 
@@ -253,56 +265,16 @@ This document tracks the current work focus, recent changes, next steps, and act
 *   **Global Configuration File (YAML/JSON):** For shared settings between backend and frontend.
 *   **Backend: Python with FastAPI.**
 *   **Frontend: Next.js with Tailwind CSS.**
-*   **Dependency Management (Backend): Poetry via terminal.** (Note: `backend/requirements.txt` still exists, may need cleanup).
+*   **Dependency Management (Backend): Poetry via terminal.**
 *   **Code Search:** Check codebase/online for existing solutions before creating new modules.
 *   **Memory Bank Usage:** Must read all memory bank files at the start of every task and update them when significant changes occur or when requested.
 
 ## 6. Learnings and Project Insights
 
-*   **JavaScript/React Error Debugging:** Fixed the `currentLabelerId is not defined` error by carefully tracing variable usage across component updates. When refactoring React components, it's critical to update all references to removed state variables. The error occurred because the variable was removed from one component but still referenced in a child component call.
+*   **UI/UX Design Impact:** The difference between a functional interface and a great interface is enormous. The new indicator design transforms the user experience from tedious to enjoyable.
 
-*   **Authentication State Management:** Successfully implemented a complete authentication flow using React Context and localStorage. The AuthContext pattern provides clean separation of authentication logic and makes it easy to access user state throughout the application.
+*   **Component Design Patterns:** Breaking complex UI into smaller, focused components (`IndicatorTag`, `CategorySection`) makes the code more maintainable and enables better reusability.
 
-*   **Task Assignment Evolution:** The transition from manual labeler ID input to authenticated user-based assignment greatly improved the user experience. This eliminated the confusing step of asking users to manually enter their ID and streamlined the workflow.
+*   **State Management for Complex UI:** Managing multiple interactive states (search, expansion, selection, filtering) requires careful planning but enables powerful user interactions.
 
-*   **Real API Integration Benefits:** Replacing placeholder data with real API calls revealed several UX improvements needed, such as better loading states and error handling. Real data integration also helped identify edge cases that weren't apparent with mock data.
-
-*   **TypeScript Error Prevention:** Adding proper TypeScript interfaces to React components (like icon components accepting className props) helps catch errors at compile time rather than runtime. This is especially important for reusable UI components.
-
-*   **Full-Stack Error Tracing:** When debugging issues, it's important to trace the complete data flow from frontend component → API call → backend endpoint → database. The `currentLabelerId` error was traced from the browser console error back to the specific component prop passing.
-
-*   **Authentication Headers Pattern:** Consistently including authentication headers in all API calls requires a systematic approach. Using a centralized token storage (AuthContext) makes it easier to ensure all requests are properly authenticated.
-
-*   **Database Volume Mount Debugging:** The key to resolving persistence issues was identifying the mismatch between the file being volume mounted (`content_detector.db`) and the actual database file the application creates (`genai_labeling.db`). Always verify the actual file paths being used by the application.
-
-*   **API Endpoint Testing:** Successfully tested the complete authentication and API key workflow using curl commands with JWT tokens. This confirmed that all backend functionality is working correctly before building the frontend UI.
-
-*   **Container Database Persistence:** Once the correct database file is volume mounted, SQLite persistence works perfectly in Docker containers. The issue was configuration, not a fundamental problem with SQLite in containers.
-
-*   **Authentication Token Workflow:** The backend properly implements JWT token generation and validation. Frontend needs to store tokens and include them in API requests using the `Authorization: Bearer <token>` header.
-
-*   **Google GenAI Migration:** The new `google-genai` package requires different import patterns (`from google import genai` instead of `import google.generativeai as genai`) and uses `genai.Client(api_key=...)` instead of `genai.configure(api_key=...)`.
-
-*   **Database Persistence in Docker:** SQLite database requires proper volume mounting and may need initialization scripts to run automatically on container startup.
-
-*   **API Key Validation:** Real API key validation requires actual network calls to the Gemini service, making it different from simple format validation.
-
-*   **Poetry in Docker Environment:** Confirmed that Poetry environment is properly set up in Docker container - all dependencies are available when running scripts with `poetry run python`.
-
-*   **Container Debugging:** Using `docker-compose logs` and `docker-compose exec` commands effectively for debugging container issues and testing functionality.
-
-*   **Global Configuration Management:** Implementing a shared configuration system between frontend and backend requires careful consideration of how each environment accesses the configuration. The backend can read directly from the filesystem, while the frontend needs to fetch the configuration via HTTP or use environment variables.
-
-*   **API Evolution Strategy:** We've successfully evolved the API from returning HTML responses to returning JSON data, which is more appropriate for a modern SPA frontend. This demonstrates how backend APIs can be adapted to better support frontend needs without completely rewriting them.
-
-*   **Schema-First Development:** Using Pydantic schemas (like our new `TaskResponse`) for API responses provides clear contracts between frontend and backend, improves type safety, and enables automatic validation and serialization.
-
-*   **Form Submission Formats:** When working with FastAPI's `Form` parameters, the frontend must use `application/x-www-form-urlencoded` or `multipart/form-data` content types rather than JSON. This requires specific handling in the frontend code.
-
-*   **Type Safety in API Integration:** Defining clear interfaces for API data (`TaskDataFromAPI`) and component state (`Task`) helps ensure type safety and reduces errors when working with data from the backend.
-
-*   **Database Schema Evolution:** Adding new columns to existing models requires careful coordination between model definitions, schemas, and database migrations or initialization scripts.
-
-*   **Restructuring Python Projects:** Restructuring Python project layouts (e.g., introducing a `src/` directory) requires careful updates to import paths, Docker configurations (`Dockerfile`, `entrypoint.sh`, `docker-compose.yml`), and any scripts that interact with the application modules.
-
-*   **Loading and Error States:** Adding proper loading and error states in the frontend is crucial for good UX when integrating with backend APIs. 
+*   **Visual Hierarchy:** Using icons, colors, and spacing effectively creates intuitive navigation even with large amounts of information.

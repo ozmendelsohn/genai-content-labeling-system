@@ -58,6 +58,54 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [autoAnalysisStarted, setAutoAnalysisStarted] = useState(false);
 
+  // Additional state for the new UI design
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+
+  // Filter indicators based on search term
+  const filterIndicators = (indicators: IndicatorItem[], searchTerm: string) => {
+    if (!searchTerm) return indicators;
+    return indicators.filter(indicator => 
+      indicator.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // Group indicators by category
+  const groupIndicatorsByCategory = (indicators: IndicatorItem[]) => {
+    return indicators.reduce((groups, indicator) => {
+      const category = (indicator as any).category || 'other';
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(indicator);
+      return groups;
+    }, {} as Record<string, IndicatorItem[]>);
+  };
+
+  // Toggle section expansion
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Category display names and icons
+  const categoryInfo = {
+    content_quality: { name: "Content Quality", icon: "📝", color: "blue" },
+    writing_style: { name: "Writing Style", icon: "✍️", color: "purple" },
+    content_structure: { name: "Content Structure", icon: "📊", color: "indigo" },
+    technical: { name: "Technical & Links", icon: "🔧", color: "gray" },
+    author_credibility: { name: "Author & Credibility", icon: "👤", color: "yellow" },
+    domain_branding: { name: "Domain & Branding", icon: "🎭", color: "pink" },
+    engagement: { name: "Engagement", icon: "💬", color: "green" },
+    visual_media: { name: "Visual & Media", icon: "🖼️", color: "red" },
+    content_duplication: { name: "Content Duplication", icon: "📋", color: "orange" },
+    transparency: { name: "Transparency", icon: "🤖", color: "cyan" },
+    design_branding: { name: "Design & Branding", icon: "🎨", color: "violet" },
+    content_organization: { name: "Content Organization", icon: "📅", color: "emerald" },
+    other: { name: "Other", icon: "📌", color: "slate" }
+  };
+
   // Load configuration on component mount
   useEffect(() => {
     const loadIndicators = async () => {
@@ -65,6 +113,10 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
         await loadConfig(); // Ensure config is loaded
         const configAiIndicators = getConfigValue('labeling.ai_indicators', defaultAiIndicators);
         const configHumanIndicators = getConfigValue('labeling.human_indicators', defaultHumanIndicators);
+        
+        console.log('Loaded AI indicators count:', configAiIndicators.length);
+        console.log('Loaded Human indicators count:', configHumanIndicators.length);
+        console.log('First AI indicator:', configAiIndicators[0]);
         
         setAiIndicators(configAiIndicators);
         setHumanIndicators(configHumanIndicators);
@@ -154,7 +206,7 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
         
         // Note: We don't auto-set the label value to avoid biasing the user's decision
         
-        setPreselectionMessage(`AI analysis complete! Pre-selected ${aiIndicatorIds.length} AI indicators and ${humanIndicatorIds.length} human indicators`);
+        setPreselectionMessage(`AI analysis complete! Relevant indicators have been pre-selected to help speed up your review.`);
       } else {
         setPreselectionMessage('AI analysis completed but no indicators were pre-selected');
       }
@@ -269,9 +321,115 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
     await attemptSubmission();
   };
 
+  // Component for rendering a single indicator tag
+  const IndicatorTag = ({ 
+    indicator, 
+    isSelected, 
+    onToggle, 
+    type 
+  }: { 
+    indicator: IndicatorItem, 
+    isSelected: boolean, 
+    onToggle: () => void, 
+    type: 'ai' | 'human' 
+  }) => {
+    const baseClasses = "inline-flex items-center px-3 py-2 rounded-full text-sm font-medium cursor-pointer transition-all duration-200 border";
+    const selectedClasses = type === 'ai' 
+      ? "bg-red-500/20 border-red-500 text-red-300 shadow-lg"
+      : "bg-green-500/20 border-green-500 text-green-300 shadow-lg";
+    const unselectedClasses = "bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-600/50 hover:border-gray-500";
+    
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`${baseClasses} ${isSelected ? selectedClasses : unselectedClasses}`}
+        disabled={isSubmitting || isLoadingConfig}
+      >
+        <span className="mr-2">{type === 'ai' ? '🤖' : '👥'}</span>
+        {indicator.label}
+        {isSelected && <span className="ml-2">✓</span>}
+      </button>
+    );
+  };
+
+  // Component for rendering category sections
+  const CategorySection = ({ 
+    category, 
+    indicators, 
+    type, 
+    selectedIndicators, 
+    onToggleIndicator 
+  }: {
+    category: string,
+    indicators: IndicatorItem[],
+    type: 'ai' | 'human',
+    selectedIndicators: string[],
+    onToggleIndicator: (id: string) => void
+  }) => {
+    const filteredIndicators = filterIndicators(indicators, searchTerm);
+    const selectedInCategory = filteredIndicators.filter(ind => selectedIndicators.includes(ind.id));
+    const categoryData = categoryInfo[category as keyof typeof categoryInfo] || categoryInfo.other;
+    const isExpanded = expandedSections[`${type}-${category}`];
+    
+    if (showOnlySelected && selectedInCategory.length === 0) {
+      return null;
+    }
+
+    const displayIndicators = showOnlySelected ? selectedInCategory : filteredIndicators;
+    
+    if (displayIndicators.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="border border-gray-600 rounded-lg bg-gray-800/50">
+        <button
+          type="button"
+          onClick={() => toggleSection(`${type}-${category}`)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-700/50 transition-colors"
+        >
+          <div className="flex items-center space-x-3">
+            <span className="text-xl">{categoryData.icon}</span>
+            <div>
+              <h4 className="text-white font-medium">{categoryData.name}</h4>
+              <p className="text-xs text-gray-400">
+                {selectedInCategory.length}/{displayIndicators.length} selected
+              </p>
+            </div>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {isExpanded && (
+          <div className="p-4 pt-0 border-t border-gray-600">
+            <div className="flex flex-wrap gap-2">
+              {displayIndicators.map(indicator => (
+                <IndicatorTag
+                  key={indicator.id}
+                  indicator={indicator}
+                  isSelected={selectedIndicators.includes(indicator.id)}
+                  onToggle={() => onToggleIndicator(indicator.id)}
+                  type={type}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="text-lg font-semibold text-white mb-3">Label This Content</h3>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <h3 className="text-lg font-semibold text-white mb-4">Label This Content</h3>
       
       {/* AI Pre-selection Section */}
       <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
@@ -292,7 +450,7 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
               <span className="inline-flex items-center">
                 <svg className="animate-spin -ml-1 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Analyzing...
               </span>
@@ -322,128 +480,225 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
           </div>
         )}
       </div>
-      
-      {isLoadingConfig && (
-        <div className="text-center p-2 text-sm text-gray-400">
-          <div className="inline-flex items-center">
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Loading indicators...
+
+      {/* Selection Summary */}
+      {(selectedAiIndicators.length > 0 || selectedHumanIndicators.length > 0) && (
+        <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+          <h4 className="text-sm font-medium text-blue-300 mb-2">Selection Summary</h4>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <span className="text-red-400">🤖 AI Indicators:</span>
+              <span className="text-white font-medium">{selectedAiIndicators.length}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-green-400">👥 Human Indicators:</span>
+              <span className="text-white font-medium">{selectedHumanIndicators.length}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-gray-400">Total Selected:</span>
+              <span className="text-white font-bold">{selectedAiIndicators.length + selectedHumanIndicators.length}</span>
+            </div>
           </div>
         </div>
       )}
       
-      <div>
-        <p className="text-sm font-medium text-gray-300 mb-3">Overall Label:</p>
-        <div className="flex space-x-3">
+      {isLoadingConfig && (
+        <div className="text-center p-4 text-sm text-gray-400">
+          <div className="inline-flex items-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading comprehensive indicators...
+          </div>
+        </div>
+      )}
+      
+      {/* Content Indicators Section - Completely Redesigned */}
+      <div className="bg-gray-800 rounded-lg border border-gray-600 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-white">🔍 Content Analysis</h3>
+          <div className="text-sm text-gray-400">
+            Total: {selectedAiIndicators.length + selectedHumanIndicators.length} selected
+          </div>
+        </div>
+
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search indicators..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isSubmitting || isLoadingConfig}
+              />
+              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowOnlySelected(!showOnlySelected)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                showOnlySelected 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              disabled={isSubmitting || isLoadingConfig}
+            >
+              {showOnlySelected ? '✓ Selected Only' : 'Show All'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                // Expand all sections with content
+                const newExpanded: Record<string, boolean> = {};
+                ['ai', 'human'].forEach(type => {
+                  const indicators = type === 'ai' ? aiIndicators : humanIndicators;
+                  Object.keys(groupIndicatorsByCategory(indicators)).forEach(category => {
+                    newExpanded[`${type}-${category}`] = true;
+                  });
+                });
+                setExpandedSections(newExpanded);
+              }}
+              className="px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-all"
+              disabled={isSubmitting || isLoadingConfig}
+            >
+              Expand All
+            </button>
+          </div>
+        </div>
+
+        {/* Tabbed Interface */}
+        <div className="space-y-6">
+          {/* AI Indicators Tab */}
+          <div>
+            <div className="flex items-center justify-between mb-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+              <h4 className="text-lg font-semibold text-red-400 flex items-center">
+                🤖 AI Content Indicators
+                <span className="ml-2 text-sm text-gray-400">({selectedAiIndicators.length} selected)</span>
+              </h4>
+              {!isLoadingConfig && aiIndicators.length > defaultAiIndicators.length && (
+                <span className="text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded">Enhanced Config</span>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              {Object.entries(groupIndicatorsByCategory(aiIndicators)).map(([category, indicators]) => (
+                <CategorySection
+                  key={category}
+                  category={category}
+                  indicators={indicators}
+                  type="ai"
+                  selectedIndicators={selectedAiIndicators}
+                  onToggleIndicator={(id) => handleIndicatorChange(id, 'ai', setSelectedAiIndicators)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Human Indicators Tab */}
+          <div>
+            <div className="flex items-center justify-between mb-4 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+              <h4 className="text-lg font-semibold text-green-400 flex items-center">
+                👥 Human Content Indicators
+                <span className="ml-2 text-sm text-gray-400">({selectedHumanIndicators.length} selected)</span>
+              </h4>
+              {!isLoadingConfig && humanIndicators.length > defaultHumanIndicators.length && (
+                <span className="text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded">Enhanced Config</span>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              {Object.entries(groupIndicatorsByCategory(humanIndicators)).map(([category, indicators]) => (
+                <CategorySection
+                  key={category}
+                  category={category}
+                  indicators={indicators}
+                  type="human"
+                  selectedIndicators={selectedHumanIndicators}
+                  onToggleIndicator={(id) => handleIndicatorChange(id, 'human', setSelectedHumanIndicators)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Overall Label Section */}
+      <div className="bg-gray-800 rounded-lg border border-gray-600 p-4">
+        <h3 className="text-lg font-semibold text-white mb-4">📝 Your Final Classification</h3>
+        <div className="flex space-x-4">
           <button
             type="button"
             onClick={() => setLabelValue('GenAI')}
-            className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 ${
+            className={`flex-1 py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 ${
               labelValue === 'GenAI'
-                ? 'bg-red-600 text-white border-2 border-red-500 shadow-lg'
-                : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                ? 'bg-red-600 text-white border-2 border-red-500 shadow-lg transform scale-105'
+                : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:bg-gray-600 hover:border-gray-500 hover:scale-102'
             }`}
             disabled={isSubmitting || isLoadingConfig}
           >
-            GenAI
+            🤖 GenAI
           </button>
           <button
             type="button"
             onClick={() => setLabelValue('Not GenAI')}
-            className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 ${
+            className={`flex-1 py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 ${
               labelValue === 'Not GenAI'
-                ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg'
-                : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg transform scale-105'
+                : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:bg-gray-600 hover:border-gray-500 hover:scale-102'
             }`}
             disabled={isSubmitting || isLoadingConfig}
           >
-            Not GenAI
+            👥 Not GenAI
           </button>
         </div>
       </div>
 
-      <div>
-        <label htmlFor="tags" className="block text-sm font-medium text-gray-300 mb-1">
-          Custom Tags (comma-separated):
+      {/* Custom Tags Section */}
+      <div className="bg-gray-800 rounded-lg border border-gray-600 p-4">
+        <label htmlFor="tags" className="block text-lg font-semibold text-white mb-3">
+          🏷️ Custom Tags (optional)
         </label>
         <input
           type="text"
           id="tags"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="e.g., news, blog, poorly written"
+          className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          placeholder="e.g., news, blog, poorly written, suspicious domain"
           disabled={isSubmitting || isLoadingConfig}
         />
+        <p className="text-xs text-gray-400 mt-2">Add comma-separated tags to help categorize this content</p>
       </div>
 
-      <div>
-        <p className="text-sm font-medium text-gray-300 mb-2">
-          AI Content Indicators (27 total):
-          {!isLoadingConfig && aiIndicators.length > defaultAiIndicators.length && (
-            <span className="text-xs text-green-400 ml-1">(from config)</span>
-          )}
-        </p>
-        <div className="space-y-2 max-h-64 overflow-y-auto bg-gray-900 p-3 rounded-lg border border-gray-700">
-          {aiIndicators.map(indicator => (
-            <label key={indicator.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800 p-2 rounded transition-colors">
-              <input 
-                type="checkbox" 
-                checked={selectedAiIndicators.includes(indicator.id)}
-                onChange={() => handleIndicatorChange(indicator.id, 'ai', setSelectedAiIndicators)}
-                className="form-checkbox text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 mt-1 flex-shrink-0"
-                disabled={isSubmitting || isLoadingConfig}
-              />
-              <span className="text-gray-300 text-sm leading-relaxed">{indicator.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-sm font-medium text-gray-300 mb-2">
-          Human Content Indicators (23 total):
-          {!isLoadingConfig && humanIndicators.length > defaultHumanIndicators.length && (
-            <span className="text-xs text-green-400 ml-1">(from config)</span>
-          )}
-        </p>
-        <div className="space-y-2 max-h-64 overflow-y-auto bg-gray-900 p-3 rounded-lg border border-gray-700">
-          {humanIndicators.map(indicator => (
-            <label key={indicator.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800 p-2 rounded transition-colors">
-              <input 
-                type="checkbox" 
-                checked={selectedHumanIndicators.includes(indicator.id)}
-                onChange={() => handleIndicatorChange(indicator.id, 'human', setSelectedHumanIndicators)}
-                className="form-checkbox text-pink-500 bg-gray-700 border-gray-600 rounded focus:ring-pink-500 mt-1 flex-shrink-0"
-                disabled={isSubmitting || isLoadingConfig}
-              />
-              <span className="text-gray-300 text-sm leading-relaxed">{indicator.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
+      {/* Submit Button */}
       <button 
         type="submit"
         disabled={isSubmitting || !labelValue || isLoadingConfig}
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:opacity-50 transition duration-150 ease-in-out"
+        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
       >
         {isSubmitting ? (
           <span className="inline-flex items-center">
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Submitting...
+            Submitting Your Analysis...
           </span>
-        ) : isLoadingConfig ? 'Loading...' : 'Submit Label'}
+        ) : isLoadingConfig ? 'Loading...' : '🚀 Submit Label'}
       </button>
 
       {message && (
-        <div className={`mt-3 p-2 text-sm text-center rounded-md border ${
+        <div className={`mt-4 p-4 text-sm text-center rounded-lg border ${
           message.includes('Error') || message.includes('Failed') 
             ? 'text-red-400 bg-red-900/20 border-red-800' 
             : message.includes('Retrying')
