@@ -50,21 +50,25 @@ graph TD
 *   **Frontend Components:** 
     *   `Layout` wraps all pages, providing consistent structure (Navbar, main content area).
     *   `Navbar` provides navigation links.
-    *   Admin pages/components (`UrlUploadForm`, `AdminUploadPage`) handle URL submission.
+    *   Admin pages/components (`UrlUploadForm`, `AdminUploadPage`, `ApiKeyManager`, `ContentAnalyzer`) handle URL submission and AI key management.
     *   Labeler pages/components (`TaskView`, `LabelingForm`, `LabelerTaskPage`) handle task display, website iframe, and label submission.
 *   **Backend Modules (Located in `backend/src/`):
     *   `main.py`: FastAPI app initialization, API endpoint definitions, Jinja2 template configuration.
     *   `models.py`: SQLAlchemy database models (User, Website, Label, Tag).
     *   `schemas.py`: Pydantic schemas for request/response validation and serialization.
     *   `database.py`: Database engine setup, `SessionLocal`, `Base` for models, `get_db` dependency, `create_db_and_tables` utility.
+    *   `ai_service.py`: Google Gemini AI integration for content analysis, web scraping, and AI-powered content detection.
+    *   `config.py`: Global configuration loading and management utilities.
     *   (No explicit `routers/` or `crud.py` modules yet; logic is currently within `main.py` for PoC).
 *   **Scripts (Located in `scripts/` at project root):
     *   `init_db.py`: Script to initialize the database schema and add default users. Interacts with modules in `backend/src/`.
 
 ## 5. Critical Implementation Paths
 
-1.  **Labeling Workflow End-to-End:** This is the core functionality. Ensuring smooth data flow from URL upload (admin) -> task assignment (labeler) -> label submission (labeler) -> database storage is critical.
-2.  **Database Schema and Initialization:** A correct and robust database schema is essential for storing data accurately. The `init_db.py` script is critical for setting up the application for the first time.
-3.  **API Endpoint Integrity:** Ensuring all API endpoints behave as expected, with correct request handling, validation, and response generation.
-4.  **Frontend-Backend Integration:** Correctly calling backend APIs from the frontend and handling responses (including errors).
-5.  **Docker Configuration:** Ensuring `Dockerfile`s and `docker-compose.yml` are correctly configured for both development and (eventual) production builds. 
+1.  **Database Persistence (Current Critical Issue):** Ensuring SQLite database file persists between container restarts is essential for system reliability. The current volume mount configuration needs investigation.
+2.  **AI Integration Workflow:** The complete path from API key management → content analysis request → Gemini AI processing → result storage is critical for the core value proposition.
+3.  **Labeling Workflow End-to-End:** This is the core functionality. Ensuring smooth data flow from URL upload (admin) → task assignment (labeler) → label submission (labeler) → database storage is critical.
+4.  **Database Schema and Initialization:** A correct and robust database schema is essential for storing data accurately. The `init_db.py` script is critical for setting up the application for the first time.
+5.  **API Endpoint Integrity:** Ensuring all API endpoints behave as expected, with correct request handling, validation, and response generation.
+6.  **Frontend-Backend Integration:** Correctly calling backend APIs from the frontend and handling responses (including errors).
+7.  **Docker Configuration:** Ensuring `Dockerfile`s and `docker-compose.yml` are correctly configured for both development and (eventual) production builds. 

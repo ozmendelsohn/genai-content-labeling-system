@@ -1,0 +1,71 @@
+# GenAI Content Detection Assistant - Global Configuration
+
+# API Configuration
+api:
+  base_url: "http://localhost:8000"
+  endpoints:
+    admin_upload: "/admin/upload_urls"
+    labeler_task: "/labeler/task"
+    labeler_submit: "/labeler/submit_label"
+    users: "/users"
+
+# Database Configuration
+database:
+  path: "content_detector.db"
+  max_connections: 10
+
+# Frontend Configuration
+frontend:
+  theme: "dark"
+  api_timeout_ms: 10000  # 10 seconds
+
+# Content Labeling Configuration
+labeling:
+  # Maximum number of labelers per website
+  max_labelers_per_website: 3
+  
+  # AI Content Indicators (used in frontend checklists)
+  ai_indicators:
+    - id: "ai-1"
+      label: "Repetitive phrasing"
+    - id: "ai-2"
+      label: "Overly formal tone"
+    - id: "ai-3"
+      label: "Lacks personal anecdotes"
+    - id: "ai-4"
+      label: "Unusual sentence structures"
+    - id: "ai-5"
+      label: "Many facts, no deep insights"
+    - id: "ai-6"
+      label: "Generic or template-like structure"
+    - id: "ai-7"
+      label: "Consistently perfect grammar"
+  
+  # Human Content Indicators (used in frontend checklists)
+  human_indicators:
+    - id: "h-1"
+      label: "Personal voice/style"
+    - id: "h-2"
+      label: "Includes personal stories/opinions"
+    - id: "h-3"
+      label: "Natural, varied language"
+    - id: "h-4"
+      label: "Occasional typos/errors"
+    - id: "h-5"
+      label: "Clear emotional expression"
+    - id: "h-6"
+      label: "Idiomatic language use"
+    - id: "h-7"
+      label: "Inconsistent formatting"
+
+# User Roles Configuration
+roles:
+  admin:
+    permissions:
+      - "upload_urls"
+      - "view_users"
+      - "view_stats"
+  labeler:
+    permissions:
+      - "request_task"
+      - "submit_label" 
