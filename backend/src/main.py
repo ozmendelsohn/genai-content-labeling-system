@@ -5,7 +5,7 @@ This is the main FastAPI application that provides REST API endpoints
 for user management, authentication, content management, and labeling.
 """
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -18,6 +18,7 @@ import asyncio
 # Import local modules
 from database import get_db, engine
 from models import User, ContentItem, Label, UserRole, ContentStatus, LabelClassification
+from sqlalchemy import or_
 from schemas import (
     UserCreate, UserResponse, UserUpdate, UserPasswordUpdate, UserListResponse,
     LoginRequest, LoginResponse, ContentItemCreate, ContentItemResponse, 
@@ -26,7 +27,7 @@ from schemas import (
     SystemStats, UserStats, DashboardData, PaginationParams, FilterParams,
     SuccessResponse, ErrorResponse, GeminiAPIKeyRequest, GeminiAPIKeyResponse,
     ContentAnalysisRequest, ContentAnalysisResponse, CompleteAnalysisResult,
-    ContentItemCreateWithAI, UserUpdateWithAI, UserResponseWithAI
+    ContentItemCreateWithAI, UserUpdateWithAI, UserResponseWithAI, TaskResponse
 )
 from auth import (
     authenticate_user, create_access_token, get_current_user, get_current_active_user,
@@ -814,6 +815,111 @@ async def analyze_url_content(
             suggested_content_item=None
         )
 
+@app.post("/ai/preselect-indicators")
+async def preselect_indicators_for_task(
+    request: Request,
+    current_user: User = Depends(require_labeler),
+    db: Session = Depends(get_db)
+):
+    """
+    Get AI-powered pre-selection of indicators for the current user's active task
+    
+    Args:
+        request: HTTP request object
+        current_user: Current authenticated labeler user
+        db: Database session
+        
+    Returns:
+        Dict: Pre-selected indicators for the current task
+    """
+    # Check if user has API key configured
+    if not current_user.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gemini API key not configured. Please set your API key first."
+        )
+    
+    # Find the user's current active task
+    current_task = db.query(ContentItem).filter(
+        ContentItem.assigned_user_id == current_user.id,
+        ContentItem.status == ContentStatus.IN_PROGRESS
+    ).first()
+    
+    if not current_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active task found for current user"
+        )
+    
+    try:
+        # Create AI analyzer
+        ai_analyzer = create_ai_analyzer(current_user.gemini_api_key)
+        
+        if not ai_analyzer:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initialize AI analyzer"
+            )
+        
+        # Perform analysis
+        analysis_result = await ai_analyzer.analyze_url_async(current_task.url)
+        ai_analysis = analysis_result.get("ai_analysis", {})
+        
+        # Extract pre-selected indicators
+        preselected_ai_indicators = ai_analysis.get("ai_indicators", [])
+        preselected_human_indicators = ai_analysis.get("human_indicators", [])
+        
+        # Log the action
+        log_user_action(
+            db=db,
+            user_id=current_user.id,
+            action="ai_preselect_indicators",
+            resource_type="content_item",
+            resource_id=str(current_task.id),
+            details={
+                "url": current_task.url,
+                "classification": ai_analysis.get("classification"),
+                "confidence_score": ai_analysis.get("confidence_score"),
+                "ai_indicators_count": len(preselected_ai_indicators),
+                "human_indicators_count": len(preselected_human_indicators)
+            },
+            request=request
+        )
+        
+        return {
+            "success": True,
+            "message": "Indicators pre-selected successfully",
+            "task_id": current_task.id,
+            "url": current_task.url,
+            "ai_analysis": {
+                "classification": ai_analysis.get("classification", "uncertain"),
+                "confidence_score": ai_analysis.get("confidence_score", 50),
+                "reasoning": ai_analysis.get("reasoning", ""),
+                "detected_patterns": ai_analysis.get("detected_patterns", "")
+            },
+            "preselected_indicators": {
+                "ai_indicators": preselected_ai_indicators,
+                "human_indicators": preselected_human_indicators
+            }
+        }
+    
+    except Exception as e:
+        # Log the error
+        log_user_action(
+            db=db,
+            user_id=current_user.id,
+            action="ai_preselect_indicators_failed",
+            resource_type="content_item",
+            resource_id=str(current_task.id) if current_task else "unknown",
+            details={"error": str(e)},
+            request=request
+        )
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to pre-select indicators: {str(e)}"
+        )
+
 @app.post("/content/with-ai", response_model=ContentItemResponse)
 async def create_content_item_with_ai_analysis(
     content_data: ContentItemCreateWithAI,
@@ -911,6 +1017,306 @@ async def remove_gemini_api_key(
     )
     
     return SuccessResponse(message="Gemini API key removed successfully")
+
+@app.post("/admin/upload_urls", response_model=SuccessResponse)
+async def admin_upload_urls(
+    request: Request,
+    urls_list: str = Form(...),
+    reset_existing: bool = Form(default=False),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload URLs from admin interface with option to reset existing URLs
+    
+    Args:
+        urls_list: Newline-separated list of URLs
+        reset_existing: Whether to reset existing URLs to PENDING status
+        request: HTTP request object
+        current_user: Current authenticated admin user
+        db: Database session
+        
+    Returns:
+        SuccessResponse: Upload results with detailed feedback
+    """
+    # Parse URLs from string
+    urls = [url.strip() for url in urls_list.split('\n') if url.strip()]
+    
+    if not urls:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid URLs provided"
+        )
+    
+    created_count = 0
+    reset_count = 0
+    skipped_count = 0
+    failed_count = 0
+    existing_urls = []
+    failed_urls = []
+    
+    for url in urls:
+        try:
+            # Check if URL already exists
+            existing_content = db.query(ContentItem).filter(ContentItem.url == url).first()
+            
+            if existing_content:
+                existing_urls.append(url)
+                
+                if reset_existing:
+                    # Reset existing URL to PENDING status and clear assignment
+                    existing_content.status = ContentStatus.PENDING
+                    existing_content.assigned_user_id = None
+                    existing_content.completed_at = None
+                    reset_count += 1
+                else:
+                    # Skip existing URL
+                    skipped_count += 1
+                continue
+            
+            # Create new content item with PENDING status
+            content_item = ContentItem(
+                url=url,
+                priority=3,  # Default priority
+                status=ContentStatus.PENDING,
+                assigned_user_id=None  # Don't pre-assign, let labelers pick up tasks
+            )
+            
+            db.add(content_item)
+            created_count += 1
+            
+        except Exception as e:
+            failed_count += 1
+            failed_urls.append(url)
+    
+    db.commit()
+    
+    # Log the action
+    log_user_action(
+        db=db,
+        user_id=current_user.id,
+        action="admin_upload_urls",
+        resource_type="content_item",
+        details={
+            "created_count": created_count,
+            "reset_count": reset_count,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count,
+            "total_urls": len(urls),
+            "reset_existing": reset_existing
+        },
+        request=request
+    )
+    
+    # Build detailed message
+    message_parts = []
+    
+    if created_count > 0:
+        message_parts.append(f"Created {created_count} new URLs")
+    
+    if reset_count > 0:
+        message_parts.append(f"Reset {reset_count} existing URLs to pending")
+    
+    if skipped_count > 0:
+        message_parts.append(f"Skipped {skipped_count} existing URLs")
+    
+    if failed_count > 0:
+        message_parts.append(f"Failed to process {failed_count} URLs")
+    
+    if not message_parts:
+        message = "No URLs were processed"
+    else:
+        message = "Upload completed: " + ", ".join(message_parts)
+    
+    return SuccessResponse(message=message)
+
+@app.get("/labeler/task", response_model=TaskResponse)
+async def get_labeler_task(
+    request: Request,
+    current_user: User = Depends(require_labeler),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a task for the current authenticated labeler
+    
+    Args:
+        request: HTTP request object
+        current_user: Current authenticated labeler user
+        db: Database session
+        
+    Returns:
+        TaskResponse: Assigned task or no task message
+    """
+    # First check if the user already has an assigned task in progress
+    existing_task = db.query(ContentItem).filter(
+        ContentItem.assigned_user_id == current_user.id,
+        ContentItem.status == ContentStatus.IN_PROGRESS
+    ).first()
+    
+    if existing_task:
+        return TaskResponse(
+            website_id=existing_task.id,
+            website_url=existing_task.url,
+            user_id=current_user.id,
+            task_start_time=datetime.utcnow().isoformat()
+        )
+    
+    # Find available content item for the labeler
+    # Look for tasks either unassigned or specifically assigned to this user
+    content_item = db.query(ContentItem).filter(
+        ContentItem.status == ContentStatus.PENDING,
+        or_(
+            ContentItem.assigned_user_id == None,
+            ContentItem.assigned_user_id == current_user.id
+        )
+    ).first()
+    
+    if not content_item:
+        return TaskResponse(
+            message_title="No Tasks",
+            message_body="No tasks available at the moment. Please check back later."
+        )
+    
+    # Assign the task if not already assigned
+    if content_item.assigned_user_id != current_user.id:
+        content_item.assigned_user_id = current_user.id
+    content_item.status = ContentStatus.IN_PROGRESS
+    db.commit()
+    db.refresh(content_item)
+    
+    # Log the action
+    log_user_action(
+        db=db,
+        user_id=current_user.id,
+        action="get_labeler_task",
+        resource_type="content_item",
+        resource_id=str(content_item.id),
+        request=request
+    )
+    
+    return TaskResponse(
+        website_id=content_item.id,
+        website_url=content_item.url,
+        user_id=current_user.id,
+        task_start_time=datetime.utcnow().isoformat()
+    )
+
+@app.post("/labeler/submit_label", response_model=SuccessResponse)
+async def submit_label(
+    request: Request,
+    website_id: str = Form(...),
+    user_id: str = Form(...),
+    label_value: str = Form(...),
+    tags_str: str = Form(..., alias="tags_str"),
+    ai_indicators_str: str = Form(..., alias="ai_indicators_str"),
+    human_indicators_str: str = Form(..., alias="human_indicators_str"),
+    task_start_time: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Submit a label for a content item via form data
+    
+    Args:
+        request: HTTP request object
+        website_id: Content item ID
+        user_id: Labeler user ID
+        label_value: Label classification (GenAI/Not GenAI)
+        tags_str: Custom tags
+        ai_indicators_str: AI indicators
+        human_indicators_str: Human indicators
+        task_start_time: Task start time
+        db: Database session
+        
+    Returns:
+        SuccessResponse: Label submission confirmation
+    """
+    try:
+        # Convert IDs to integers
+        content_item_id = int(website_id)
+        labeler_id = int(user_id)
+        
+        # Find the content item
+        content_item = db.query(ContentItem).filter(
+            ContentItem.id == content_item_id,
+            ContentItem.assigned_user_id == labeler_id
+        ).first()
+        
+        if not content_item:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Content item not found or not assigned to the specified user"
+            )
+        
+        # Map label value to classification
+        if label_value.lower() == "genai":
+            classification = LabelClassification.AI_GENERATED
+        elif label_value.lower() == "not genai":
+            classification = LabelClassification.HUMAN_CREATED
+        else:
+            classification = LabelClassification.UNCERTAIN
+        
+        # Parse indicators
+        ai_indicators = [ind.strip() for ind in ai_indicators_str.split(',') if ind.strip()]
+        human_indicators = [ind.strip() for ind in human_indicators_str.split(',') if ind.strip()]
+        custom_tags = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+        
+        # Calculate time spent (optional, can be improved)
+        time_spent_seconds = 0
+        try:
+            start_time = datetime.fromisoformat(task_start_time.replace('Z', '+00:00'))
+            time_spent_seconds = int((datetime.utcnow() - start_time.replace(tzinfo=None)).total_seconds())
+        except:
+            pass  # Use default if parsing fails
+        
+        # Create new label
+        new_label = Label(
+            content_item_id=content_item_id,
+            labeler_id=labeler_id,
+            classification=classification,
+            confidence_score=80,  # Default confidence
+            ai_indicators=json.dumps(ai_indicators),
+            human_indicators=json.dumps(human_indicators),
+            custom_tags=json.dumps(custom_tags),
+            time_spent_seconds=max(0, time_spent_seconds),
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(new_label)
+        
+        # Mark content item as completed
+        content_item.status = ContentStatus.COMPLETED
+        content_item.completed_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(new_label)
+        
+        # Log the action
+        log_user_action(
+            db=db,
+            user_id=labeler_id,
+            action="submit_label",
+            resource_type="label",
+            resource_id=str(new_label.id),
+            details={
+                "content_item_id": content_item_id,
+                "classification": classification.value,
+                "time_spent": time_spent_seconds
+            },
+            request=request
+        )
+        
+        return SuccessResponse(message="Label submitted successfully")
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid data format: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit label: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn

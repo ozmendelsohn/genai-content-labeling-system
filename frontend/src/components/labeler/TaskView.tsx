@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import LabelingForm from './LabelingForm';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
@@ -27,11 +28,11 @@ export default function TaskView() {
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentLabelerId, setCurrentLabelerId] = useState<string>('2'); // Default or fetched user ID
+  const { user, token } = useAuth();
 
   const fetchTask = async () => {
-    if (!currentLabelerId.trim()) {
-      setError("Please enter a valid Labeler ID.");
+    if (!token) {
+      setError("You must be logged in to fetch tasks.");
       return;
     }
     setIsLoading(true);
@@ -40,7 +41,11 @@ export default function TaskView() {
 
     const attemptFetch = async (attempt: number = 1): Promise<void> => {
       try {
-        const response = await fetch(`${API_BASE_URL}/labeler/task?user_id=${currentLabelerId}`);
+        const response = await fetch(`${API_BASE_URL}/labeler/task`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         
         // Handle different response types
         let data;
@@ -117,6 +122,13 @@ export default function TaskView() {
     await attemptFetch();
   };
 
+  // Auto-fetch task on component mount if user is authenticated
+  useEffect(() => {
+    if (token && user && !task && !isLoading) {
+      fetchTask();
+    }
+  }, [token, user]);
+
   return (
     <div className="space-y-6">
       {!task && !isLoading && (
@@ -133,28 +145,17 @@ export default function TaskView() {
               {error}
             </div>
           )}
-          <div className="mb-4 max-w-xs mx-auto">
-            <label htmlFor="userIdInput" className="block text-sm font-medium text-gray-300 mb-1">
-              Enter Your Labeler ID (e.g., 2, 3, 4):
-            </label>
-            <input 
-              type="text"
-              id="userIdInput" // Changed id to avoid conflict if LabelingForm also has userId
-              value={currentLabelerId}
-              onChange={(e) => setCurrentLabelerId(e.target.value)}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter User ID"
-              disabled={isLoading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isLoading && currentLabelerId.trim()) {
-                  fetchTask();
-                }
-              }}
-            />
+          <div className="mb-4">
+            <p className="text-gray-300 mb-4">
+              Welcome, {user?.full_name || user?.username}! 
+              {error?.includes('No tasks available') 
+                ? ' There are currently no tasks available for labeling.' 
+                : ' Click below to request a new labeling task.'}
+            </p>
           </div>
           <button
             onClick={fetchTask}
-            disabled={!currentLabelerId.trim() || isLoading}
+            disabled={isLoading || !token}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-md disabled:opacity-50 transition duration-150 ease-in-out"
           >
             {isLoading ? (
@@ -199,7 +200,7 @@ export default function TaskView() {
             ></iframe>
           </div>
           <div className="md:col-span-1 bg-gray-800 p-4 rounded-lg shadow">
-            <LabelingForm task={task} onSubmitSuccess={() => { setTask(null); fetchTask();}} currentLabelerId={currentLabelerId} />
+            <LabelingForm task={task} onSubmitSuccess={() => { setTask(null); fetchTask();}} currentLabelerId={task.userId} />
           </div>
         </div>
       )}

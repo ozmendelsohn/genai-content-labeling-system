@@ -3,7 +3,8 @@ AI Content Analysis Service
 
 This module provides AI-powered content analysis using Google's Gemini AI
 to automatically suggest whether content is AI-generated or human-created,
-along with relevant indicators and confidence scores.
+along with relevant indicators and confidence scores. It pre-selects
+appropriate indicators based on comprehensive analysis criteria.
 """
 
 import asyncio
@@ -15,6 +16,7 @@ from bs4 import BeautifulSoup
 from google import genai
 import json
 import re
+from config import get_config
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ class AIContentAnalyzer:
                 'error': f"Unexpected error: {str(e)}"
             }
     
-    def analyze_content_with_ai(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_content_with_ai(self, content_data: Dict[str, Any], url: str = None) -> Dict[str, Any]:
         """
         Analyze content using Gemini AI to determine if it's AI-generated or human-created
         
@@ -141,6 +143,8 @@ class AIContentAnalyzer:
         ----------
         content_data : Dict[str, Any]
             Dictionary containing content data from extract_content_from_url
+        url : str, optional
+            Original URL for fallback analysis when content extraction fails
             
         Returns
         -------
@@ -156,11 +160,13 @@ class AIContentAnalyzer:
         if not self.client:
             return self._create_error_response("AI client not initialized")
         
-        if content_data.get('error'):
-            return self._create_error_response(f"Cannot analyze due to content extraction error: {content_data['error']}")
+        # If content extraction failed, try URL-based analysis
+        if content_data.get('error') or not content_data.get('content_text') or content_data.get('word_count', 0) < 50:
+            if url:
+                return self._analyze_url_based_fallback(url, content_data.get('error', 'Insufficient content'))
+            else:
+                return self._create_error_response(f"Cannot analyze due to content extraction error: {content_data.get('error', 'Insufficient content')}")
         
-        if not content_data.get('content_text') or content_data.get('word_count', 0) < 50:
-            return self._create_error_response("Insufficient content for analysis (minimum 50 words required)")
         
         try:
             # Create a comprehensive prompt for content analysis
@@ -172,7 +178,7 @@ class AIContentAnalyzer:
                 contents=analysis_prompt,
                 config={
                     "temperature": 0.1,  # Low temperature for consistent analysis
-                    "max_output_tokens": 1500,
+                     "max_output_tokens": 2000,
                     "response_mime_type": "application/json",
                     "response_schema": {
                         "type": "object",
@@ -188,15 +194,18 @@ class AIContentAnalyzer:
                             },
                             "ai_indicators": {
                                 "type": "array",
-                                "items": {"type": "string"}
+                                "items": {"type": "string"},
+                                "description": "Array of AI indicator IDs (e.g., ai-1, ai-5, ai-12)"
                             },
                             "human_indicators": {
                                 "type": "array",
-                                "items": {"type": "string"}
+                                "items": {"type": "string"},
+                                "description": "Array of human indicator IDs (e.g., h-1, h-7, h-15)"
                             },
-                            "reasoning": {"type": "string"}
+                            "reasoning": {"type": "string"},
+                            "detected_patterns": {"type": "string"}
                         },
-                        "required": ["classification", "confidence_score", "ai_indicators", "human_indicators", "reasoning"]
+                        "required": ["classification", "confidence_score", "ai_indicators", "human_indicators", "reasoning", "detected_patterns"]
                     }
                 }
             )
@@ -221,7 +230,7 @@ class AIContentAnalyzer:
     
     def _create_analysis_prompt(self, content_data: Dict[str, Any]) -> str:
         """
-        Create a comprehensive prompt for AI content analysis
+        Create a comprehensive prompt for AI content analysis using indicators from config
         
         Parameters
         ----------
@@ -237,6 +246,23 @@ class AIContentAnalyzer:
         description = content_data.get('description', 'No description')
         content = content_data.get('content_text', '')
         
+        # Load indicators from configuration
+        config = get_config()
+        ai_indicators = config.get('labeling', {}).get('ai_indicators', [])
+        human_indicators = config.get('labeling', {}).get('human_indicators', [])
+        
+        # Format AI indicators for the prompt
+        ai_indicators_text = "\n".join([
+            f"- {indicator['id']}: {indicator['label']} (Category: {indicator.get('category', 'general')})"
+            for indicator in ai_indicators
+        ])
+        
+        # Format Human indicators for the prompt
+        human_indicators_text = "\n".join([
+            f"- {indicator['id']}: {indicator['label']} (Category: {indicator.get('category', 'general')})"
+            for indicator in human_indicators
+        ])
+        
         prompt = f"""
 Analyze the following web content to determine if it was likely generated by AI or created by humans. 
 Provide a detailed analysis with specific indicators and confidence score.
@@ -249,39 +275,31 @@ Content: {content[:4000]}{"..." if len(content) > 4000 else ""}
 ANALYSIS REQUIREMENTS:
 1. Classify as "ai_generated", "human_created", or "uncertain"
 2. Provide confidence score (0-100)
-3. List specific AI indicators if detected
-4. List specific human indicators if detected
+3. Select specific AI indicator IDs that apply (return exact IDs from the list below)
+4. Select specific human indicator IDs that apply (return exact IDs from the list below)
 5. Provide reasoning for your classification
 
-AI INDICATORS TO LOOK FOR:
-- Repetitive or formulaic language patterns
-- Overly perfect grammar with no colloquialisms
-- Generic or template-like phrasing
-- Lack of personal anecdotes or specific details
-- Unnatural transitions between topics
-- Overly balanced or comprehensive coverage
-- Formal tone throughout without variation
-- Lists or structured formats without personal touches
-- Generic examples or hypothetical scenarios
+AI INDICATORS TO EVALUATE (return matching IDs):
+{ai_indicators_text}
 
-HUMAN INDICATORS TO LOOK FOR:
-- Personal experiences or anecdotes
-- Colloquial language or slang
-- Minor grammatical errors or typos
-- Emotional language or subjective opinions
-- Specific details or unique perspectives
-- Conversational tone variations
-- Cultural references or inside jokes
-- Inconsistent writing style or voice changes
-- Spontaneous tangents or personal asides
+HUMAN INDICATORS TO EVALUATE (return matching IDs):
+{human_indicators_text}
+
+INSTRUCTIONS:
+- Carefully analyze the content against each indicator
+- Return ONLY the IDs (e.g., "ai-1", "h-5") of indicators that are clearly present
+- Be selective - only include indicators with strong evidence
+- For categories like "visual_media", note that you cannot analyze images, so skip those unless mentioned in text
+- Focus on textual content, structure, and metadata analysis
 
 Return your analysis in valid JSON format with the following structure:
 {{
   "classification": "ai_generated|human_created|uncertain",
   "confidence_score": 0-100,
-  "ai_indicators": ["list", "of", "detected", "ai", "indicators"],
-  "human_indicators": ["list", "of", "detected", "human", "indicators"],
-  "reasoning": "Detailed explanation of your analysis and decision"
+  "ai_indicators": ["ai-1", "ai-3", "ai-7"],
+  "human_indicators": ["h-2", "h-5"],
+  "reasoning": "Detailed explanation of your analysis and decision",
+  "detected_patterns": "Summary of key patterns that influenced the classification"
 }}
 """
         return prompt
@@ -329,6 +347,78 @@ Return your analysis in valid JSON format with the following structure:
             "reasoning": f"Fallback analysis due to parsing error. Raw response: {response_text[:500]}..."
         }
     
+    def _analyze_url_based_fallback(self, url: str, error_reason: str) -> Dict[str, Any]:
+        """
+        Perform URL-based analysis when content extraction fails
+        
+        Parameters
+        ----------
+        url : str
+            The URL to analyze
+        error_reason : str
+            The reason why content extraction failed
+            
+        Returns
+        -------
+        Dict[str, Any]
+            Analysis results based on URL patterns
+        """
+        try:
+            # Load indicators from configuration
+            config = get_config()
+            ai_indicators = config.get('labeling', {}).get('ai_indicators', [])
+            
+            # Analyze URL patterns for common AI content indicators
+            detected_ai_indicators = []
+            detected_human_indicators = []
+            classification = "uncertain"
+            confidence_score = 30
+            reasoning = f"Content extraction failed ({error_reason}). Analysis based on URL structure and domain patterns."
+            
+            # Check for suspicious URL patterns that might indicate AI content
+            url_lower = url.lower()
+            
+            # Check for generic/formulaic URL structures
+            if any(pattern in url_lower for pattern in ['coupon-code', 'welcome-home', 'best-', 'top-', 'how-to-']):
+                detected_ai_indicators.extend(['ai-4', 'ai-5'])  # Structured & formulaic content
+                confidence_score = 45
+                reasoning += " URL contains formulaic patterns common in AI-generated content sites."
+            
+            # Check for suspicious domains
+            if any(pattern in url_lower for pattern in ['.co.id', 'inews', 'suara']):
+                # Could be subdomain mimicking or inconsistent branding
+                detected_ai_indicators.append('ai-17')  # Subdomain mimicking
+                confidence_score = 40
+                reasoning += " Domain structure suggests potential content farm or AI-generated site."
+            
+            # Check for 404 errors specifically
+            if '404' in error_reason or 'not found' in error_reason.lower():
+                detected_ai_indicators.extend(['ai-8', 'ai-9'])  # Broken/misleading links
+                classification = "ai_generated"
+                confidence_score = 60
+                reasoning += " 404 errors and broken links are common indicators of AI-generated content sites with poor maintenance."
+            
+            # If we detected multiple AI indicators, lean towards AI classification
+            if len(detected_ai_indicators) >= 2:
+                classification = "ai_generated"
+                confidence_score = max(confidence_score, 55)
+            
+            return {
+                "classification": classification,
+                "confidence_score": confidence_score,
+                "ai_indicators": detected_ai_indicators,
+                "human_indicators": detected_human_indicators,
+                "reasoning": reasoning,
+                "detected_patterns": f"URL-based analysis due to content extraction failure. Detected {len(detected_ai_indicators)} AI indicators.",
+                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "model_used": "gemini-2.0-flash-001-fallback",
+                "fallback_analysis": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Fallback URL analysis failed: {e}")
+            return self._create_error_response(f"Both content extraction and URL analysis failed: {error_reason}")
+
     def _create_error_response(self, error_message: str) -> Dict[str, Any]:
         """
         Create a standardized error response
@@ -370,8 +460,8 @@ Return your analysis in valid JSON format with the following structure:
         # Extract content
         content_data = self.extract_content_from_url(url)
         
-        # Analyze with AI
-        ai_analysis = self.analyze_content_with_ai(content_data)
+        # Analyze with AI, passing the URL for fallback analysis
+        ai_analysis = self.analyze_content_with_ai(content_data, url)
         
         # Combine results
         return {

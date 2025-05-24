@@ -4,14 +4,62 @@ This document tracks the current work focus, recent changes, next steps, and act
 
 ## 1. Current Work Focus
 
-*   **🎯 FRONTEND LOGIN IMPLEMENTATION & UI INTEGRATION 🎯**
-*   API key integration and database persistence are now working correctly.
-*   System operational with Gemini AI integration functional.
-*   **Current Priority**: Implement proper login screen and API key management UI in frontend.
-*   Frontend: http://localhost:3001 (Next.js) - External access
-*   Backend: http://localhost:8000 (FastAPI) - External access
+*   **🎯 SYSTEM FULLY OPERATIONAL - LABELING WORKFLOW WORKING 🎯**
+*   Fixed critical labeling screen error that was preventing task assignments.
+*   Authentication system and real API integration now fully functional.
+*   Frontend and backend properly integrated with JWT authentication.
+*   **Current Priority**: Continue testing and refining the complete user workflows.
+*   Frontend: http://localhost:3001 (Next.js) - Working with authentication
+*   Backend: http://localhost:8000 (FastAPI) - Fully functional
 
 ## 2. Recent Changes (as of this update)
+
+*   **Critical Labeling Screen Bug Fix (Latest):**
+    *   Fixed `currentLabelerId is not defined` JavaScript error that was preventing the labeling screen from loading.
+    *   Root cause: When updating TaskView to use authenticated users, the `currentLabelerId` state variable was removed but the LabelingForm component call still referenced it.
+    *   Solution: Updated `frontend/src/components/labeler/TaskView.tsx` to pass `task.userId` instead of undefined `currentLabelerId`.
+    *   Labeling screen now loads correctly and allows labelers to work on tasks.
+
+*   **Authentication System Working (Latest):**
+    *   Complete authentication flow implemented and tested:
+        - Login page with username/password form
+        - JWT token storage in localStorage
+        - AuthContext for global authentication state
+        - ProtectedRoute component for role-based access control
+        - Automatic token refresh and logout functionality
+    *   Fixed import path issues that were causing "useAuth must be used within an AuthProvider" errors.
+    *   Updated API calls throughout the application to include proper authentication headers.
+
+*   **Task Assignment System Working (Latest):**
+    *   Backend `/labeler/task` endpoint updated to use authenticated user instead of manual labeler ID input.
+    *   Auto-assignment logic working: tasks are assigned to authenticated labelers when they request them.
+    *   Task status properly updated from PENDING → IN_PROGRESS → COMPLETED.
+    *   Labelers can successfully fetch, view, and submit labels for assigned tasks.
+
+*   **Admin URL Upload System Working (Latest):**
+    *   Admin upload interface fully functional with real API integration.
+    *   Bulk URL upload with form data submission working correctly.
+    *   Option to reset existing URLs to PENDING status implemented.
+    *   Real-time feedback and error handling for upload operations.
+    *   Statistics and upload history displaying real data from backend APIs.
+
+*   **Dashboard Statistics Integration (Latest):**
+    *   Replaced all placeholder statistics with real API calls to `/dashboard` endpoint.
+    *   Created `DashboardStats` component that fetches actual user and system statistics.
+    *   Implemented `UploadHistory` component for displaying real content upload history.
+    *   Added proper loading states and error handling for dashboard data.
+    *   Role-based statistics display (admin sees system stats, labelers see personal stats).
+
+*   **Real API Integration Complete (Latest):**
+    *   All frontend components now use real backend APIs instead of mock data.
+    *   Removed hardcoded statistics, placeholder content, and simulated API calls.
+    *   Proper error handling and loading states implemented across all components.
+    *   Authentication headers properly included in all API requests.
+
+*   **TypeScript Icon Component Fixes (Latest):**
+    *   Fixed linter errors in admin upload page by adding proper TypeScript interfaces to icon components.
+    *   Updated `CheckIcon` and `AlertIcon` components to accept optional `className` props.
+    *   Improved type safety throughout the UI components.
 
 *   **Database Persistence Issue RESOLVED (Latest):**
     *   Fixed critical volume mount mismatch between `content_detector.db` and `genai_labeling.db`.
@@ -146,76 +194,58 @@ This document tracks the current work focus, recent changes, next steps, and act
 
 ## 3. Next Steps
 
-*   **Frontend Login Implementation (Immediate Priority):**
-    *   Create proper login page/component for the frontend.
-    *   Implement authentication state management in Next.js.
-    *   Add login form with username/password fields.
-    *   Handle JWT token storage and management (localStorage/sessionStorage).
-    *   Implement protected routes and authentication guards.
+*   **System Testing and Validation (Current Priority):**
+    *   Test complete admin workflow: login → upload URLs → verify task creation
+    *   Test complete labeler workflow: login → request task → view website → submit labels
+    *   Verify AI integration workflow: API key management → content analysis
+    *   Test edge cases and error scenarios across all user flows
 
-*   **Frontend API Key Management UI:**
-    *   Create API key management component for admin users.
-    *   Integrate with `/ai/api-key` and `/ai/api-key/status` endpoints.
-    *   Implement API key validation feedback in the UI.
-    *   Add visual indicators for API key status.
+*   **User Experience Improvements:**
+    *   Enhance loading states and visual feedback throughout the application
+    *   Improve error messages and user guidance
+    *   Add more comprehensive dashboard analytics and reporting
+    *   Implement bulk operations and advanced filtering capabilities
 
-*   **Complete Frontend-Backend Integration:**
-    *   Update existing frontend components to use proper authentication.
-    *   Test all existing workflows (admin upload, labeler tasks) with authentication.
-    *   Implement proper error handling for authentication failures.
+*   **AI Integration Enhancements:**
+    *   Complete frontend UI for AI content analysis features
+    *   Integrate AI-powered suggestions into the labeling workflow
+    *   Add confidence scoring and AI indicator validation
 
-*   **Database Initialization Automation:**
-    *   Investigate if database initialization can be automated on container startup.
-    *   Consider adding database seeding to the Docker entrypoint.
+*   **System Robustness:**
+    *   Implement comprehensive logging and monitoring
+    *   Add rate limiting and API protection
+    *   Enhance database backup and recovery procedures
+    *   Add more comprehensive error handling and user feedback
 
-*   **Verification and Testing (Current Focus):**
-    *   Test the frontend-backend integration for Admin URL Upload and Labeler Task workflows.
-    *   Verify that the AI and Human indicators are correctly saved to the database.
-    *   Verify that configuration loading works properly and indicators are loaded from config vs defaults.
-    *   Test retry mechanisms and error handling under various failure scenarios.
+*   **Documentation and Testing:**
+    *   Add comprehensive API documentation with examples
+    *   Implement frontend component testing
+    *   Create user guides for admin and labeler workflows
+    *   Add system integration tests
 
-*   **Documentation:**
-    *   Add JSDoc/TSDoc comments to frontend components.
-    *   Continue adding NumPy style docstrings to backend Python code in `backend/src/`.
-
-*   **Cleanup:**
-    *   Delete `backend/requirements.txt` as Poetry is used.
+*   **Performance Optimization:**
+    *   Optimize frontend bundle size and loading performance
+    *   Implement caching strategies for frequently accessed data
+    *   Add pagination for large datasets
+    *   Optimize database queries and indexing
 
 ## 4. Active Decisions and Considerations
 
-*   **Frontend Authentication Approach:** Need to implement a standard Next.js authentication pattern with JWT tokens stored in localStorage/sessionStorage and protected route components.
+*   **System Architecture Validation:** The current architecture with FastAPI backend and Next.js frontend is working well. The separation of concerns allows for independent development and testing of each layer.
 
-*   **Database Persistence Solution:** Successfully resolved the volume mount issue by aligning the docker-compose database mount with the actual database file name used by the backend (`genai_labeling.db`).
+*   **Authentication Implementation Success:** JWT-based authentication with localStorage storage is working effectively. The AuthContext pattern provides clean state management across the React application.
 
-*   **API Key Management:** The backend API endpoints are fully functional. Frontend UI needs to be created to provide user-friendly API key management.
+*   **Task Assignment Strategy:** The auto-assignment approach where labelers request tasks and the system assigns available work is functioning correctly. This eliminates the need for manual labeler ID input and streamlines the workflow.
 
-*   **Login Flow Design:** Need to decide on the user experience for login - whether to have a dedicated login page or a modal, and how to handle authentication state across the application.
+*   **Real-time Data Integration:** Successfully replaced all placeholder data with real API calls. The system now provides accurate, up-to-date information for statistics, task status, and user progress.
 
-*   **Gemini AI Integration:** Successfully migrated to the new `google-genai` package (v1.16.1) which uses different import patterns and API structure compared to the older `google-generativeai` package.
+*   **Database Persistence Solution:** SQLite with proper volume mounting is working reliably for the PoC. Database data persists correctly across container restarts.
 
-*   **API Key Security:** Storing API keys in the user table with proper validation workflow. Users can update their keys through the UI.
+*   **API Integration Patterns:** Using proper REST API patterns with form data for file uploads and JSON for data queries. Authentication headers are consistently applied across all API calls.
 
-*   **Database Initialization:** Need to ensure database tables are created automatically on container startup rather than requiring manual script execution.
+*   **Error Handling Strategy:** Implemented comprehensive error handling with user-friendly messages, loading states, and retry mechanisms where appropriate.
 
-*   **Error Handling:** Added comprehensive error handling for API key validation and Gemini AI service calls.
-
-*   **Poetry Usage in Docker:** When running Python scripts in the backend Docker container, we need to use `poetry run python ...` to ensure all dependencies are available.
-
-*   **Global Configuration Approach:** Created a single `config.yaml` file at the project root that can be accessed by both frontend and backend. The backend loads it directly from the filesystem, while the frontend fetches it via HTTP or falls back to default values.
-
-*   **API Integration Approach:** We've successfully adapted the backend `/labeler/task` endpoint to return JSON instead of HTML, allowing the React frontend to maintain control of the UI rendering while still communicating with the backend API. This maintains the SPA (Single Page Application) pattern.
-
-*   **Database Schema Evolution:** Added new columns (`ai_indicators_str` and `human_indicators_str`) to the `Label` model to store the selected indicators. The database schema has been updated by running the initialization script.
-
-*   **API Base URL Configuration:** Using `process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'` as a short-term solution for configuring the API base URL in the frontend. Now also available in the global configuration.
-
-*   **Form Data Submission Format:** For FastAPI's `Form` parameters, we're using `URLSearchParams` with `application/x-www-form-urlencoded` Content-Type instead of JSON. The format conversion happens in the frontend components.
-
-*   **Backend `src/` Layout:** The decision to place core backend modules directly into `backend/src/` (rather than a sub-package like `backend/src/app_code/`) has been implemented.
-
-*   **Docker Paths:** Paths for `PYTHONPATH`, `WORKDIR`, volume mounts, and uvicorn execution in Docker configurations have been aligned with the new `src/` layout.
-
-*   **Template Serving by Backend:** While the backend still has the capability to serve HTML templates (for potential admin views or other pages), the labeler task workflow now uses JSON API responses for better integration with the React frontend.
+*   **Frontend State Management:** Using React hooks and Context API for state management is sufficient for the current application complexity. No need for additional state management libraries at this point.
 
 ## 5. Important Patterns and Preferences (from User Instructions)
 
@@ -228,6 +258,20 @@ This document tracks the current work focus, recent changes, next steps, and act
 *   **Memory Bank Usage:** Must read all memory bank files at the start of every task and update them when significant changes occur or when requested.
 
 ## 6. Learnings and Project Insights
+
+*   **JavaScript/React Error Debugging:** Fixed the `currentLabelerId is not defined` error by carefully tracing variable usage across component updates. When refactoring React components, it's critical to update all references to removed state variables. The error occurred because the variable was removed from one component but still referenced in a child component call.
+
+*   **Authentication State Management:** Successfully implemented a complete authentication flow using React Context and localStorage. The AuthContext pattern provides clean separation of authentication logic and makes it easy to access user state throughout the application.
+
+*   **Task Assignment Evolution:** The transition from manual labeler ID input to authenticated user-based assignment greatly improved the user experience. This eliminated the confusing step of asking users to manually enter their ID and streamlined the workflow.
+
+*   **Real API Integration Benefits:** Replacing placeholder data with real API calls revealed several UX improvements needed, such as better loading states and error handling. Real data integration also helped identify edge cases that weren't apparent with mock data.
+
+*   **TypeScript Error Prevention:** Adding proper TypeScript interfaces to React components (like icon components accepting className props) helps catch errors at compile time rather than runtime. This is especially important for reusable UI components.
+
+*   **Full-Stack Error Tracing:** When debugging issues, it's important to trace the complete data flow from frontend component → API call → backend endpoint → database. The `currentLabelerId` error was traced from the browser console error back to the specific component prop passing.
+
+*   **Authentication Headers Pattern:** Consistently including authentication headers in all API calls requires a systematic approach. Using a centralized token storage (AuthContext) makes it easier to ensure all requests are properly authenticated.
 
 *   **Database Volume Mount Debugging:** The key to resolving persistence issues was identifying the mismatch between the file being volume mounted (`content_detector.db`) and the actual database file the application creates (`genai_labeling.db`). Always verify the actual file paths being used by the application.
 

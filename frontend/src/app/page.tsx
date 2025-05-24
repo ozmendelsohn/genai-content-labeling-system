@@ -12,8 +12,9 @@ import { Card } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import ApiKeyManager from '@/components/ui/ApiKeyManager';
 import ContentAnalyzer from '@/components/ui/ContentAnalyzer';
+import DashboardStats from '@/components/ui/DashboardStats';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { useAuth } from '@/components/auth/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   SparklesIcon, 
   DocumentTextIcon, 
@@ -210,6 +211,20 @@ function DashboardContent() {
             <ContentAnalyzer hasApiKey={hasApiKey} />
           </div>
         </div>
+
+        {/* Dashboard Statistics for Admins */}
+        {user?.role === 'admin' && (
+          <div className="mt-16">
+            <Card>
+              <div className="p-6">
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">
+                  System Overview
+                </h3>
+                <DashboardStats variant="admin" />
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Recent Activity */}
         <div className="mt-16">

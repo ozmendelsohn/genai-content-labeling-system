@@ -8,7 +8,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from './LoginForm';
 import { User } from '@/lib/auth';
 
@@ -60,7 +60,7 @@ export default function ProtectedRoute({
   fallback, 
   redirectTo 
 }: ProtectedRouteProps) {
-  const { user, isLoading, isLoggedIn } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   // Show loading while checking authentication
   if (isLoading) {
@@ -68,7 +68,7 @@ export default function ProtectedRoute({
   }
 
   // Show login form if not authenticated
-  if (!isLoggedIn || !user) {
+  if (!isAuthenticated || !user) {
     return <LoginForm redirectTo={redirectTo} />;
   }
 

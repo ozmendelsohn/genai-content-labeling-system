@@ -9,20 +9,33 @@
 
 import React, { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/components/auth/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
+import LoginForm from '@/components/auth/LoginForm';
 
 interface AuthenticatedLayoutProps {
   children: ReactNode;
 }
 
 export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
-  const { isLoggedIn, isLoading } = useAuth();
-  const pathname = usePathname();
+  const { isAuthenticated, isLoading, login } = useAuth();
 
-  // Don't show navbar on login page or while loading
-  const isLoginPage = pathname === '/login';
-  const shouldShowNavbar = isLoggedIn && !isLoginPage && !isLoading;
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return <LoginForm onLoginSuccess={login} />;
+  }
+
+  // Show authenticated layout
+  const shouldShowNavbar = isAuthenticated;
 
   return (
     <>

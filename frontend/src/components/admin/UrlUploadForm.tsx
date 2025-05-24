@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
@@ -8,6 +9,7 @@ export default function UrlUploadForm() {
   const [urls, setUrls] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { token } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -29,6 +31,7 @@ export default function UrlUploadForm() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Bearer ${token}`,
           },
           body: formData,
         });

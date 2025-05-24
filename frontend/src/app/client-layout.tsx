@@ -8,7 +8,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
-import { AuthProvider } from '@/components/auth/AuthContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import AuthenticatedLayout from './authenticated-layout';
 
 interface ClientLayoutProps {

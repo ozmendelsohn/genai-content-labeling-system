@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/design-system';
 import Input from './Input';
 import Button from './Button';
@@ -33,19 +34,25 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
   const [status, setStatus] = useState<ApiKeyStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const { token } = useAuth();
 
-  // Check initial API key status
+  // Check initial API key status only when authenticated
   useEffect(() => {
-    checkApiKeyStatus();
-  }, []);
+    if (token) {
+      checkApiKeyStatus();
+    }
+  }, [token]);
 
   const checkApiKeyStatus = async () => {
     try {
       setChecking(true);
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        setChecking(false);
+        return;
+      }
 
-      const response = await fetch('/api/ai/api-key/status', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/ai/api-key/status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -69,12 +76,12 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('/api/ai/api-key', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/ai/api-key`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,10 +112,10 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
   const handleRemoveApiKey = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
       if (!token) return;
 
-      const response = await fetch('/api/ai/api-key', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/ai/api-key`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -129,6 +136,25 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
       setLoading(false);
     }
   };
+
+  // Show login required message if not authenticated
+  if (!token) {
+    return (
+      <div className={cn("space-y-4", className)}>
+        <div className="flex items-center space-x-2">
+          <KeyIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white">
+            Gemini AI API Key
+          </h3>
+        </div>
+        <div className="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            Please log in to configure your Gemini AI API key.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (checking) {
     return (

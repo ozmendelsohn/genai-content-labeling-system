@@ -12,7 +12,12 @@ import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/Card'
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Badge from '@/components/ui/Badge';
+import DashboardStats from '@/components/ui/DashboardStats';
+import UploadHistory from '@/components/ui/UploadHistory';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 // Icons
 const UploadIcon = () => (
@@ -27,14 +32,14 @@ const LinkIcon = () => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
   </svg>
 );
 
-const AlertIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const AlertIcon = ({ className }: { className?: string }) => (
+  <svg className={className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
   </svg>
 );
@@ -55,11 +60,9 @@ function AdminUploadContent() {
   const [urls, setUrls] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
-  const [uploadHistory, setUploadHistory] = useState([
-    { id: 1, timestamp: '2024-01-15 14:30', count: 25, status: 'completed' },
-    { id: 2, timestamp: '2024-01-15 12:15', count: 50, status: 'completed' },
-    { id: 3, timestamp: '2024-01-15 09:45', count: 12, status: 'failed' },
-  ]);
+  const { token } = useAuth();
+
+  const [resetExisting, setResetExisting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,9 +70,6 @@ function AdminUploadContent() {
     setResult(null);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       const urlList = urls.split('\n').filter(url => url.trim());
       
       if (urlList.length === 0) {
@@ -77,29 +77,47 @@ function AdminUploadContent() {
           success: false,
           message: 'Please enter at least one URL'
         });
+        setIsLoading(false);
         return;
       }
 
-      // Simulate success
-      setResult({
-        success: true,
-        message: 'URLs uploaded successfully!',
-        count: urlList.length
+      const formData = new URLSearchParams();
+      formData.append('urls_list', urls);
+      formData.append('reset_existing', resetExisting.toString());
+
+      const response = await fetch(`${API_BASE_URL}/admin/upload_urls`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
       });
 
-      // Add to history
-      setUploadHistory(prev => [{
-        id: Date.now(),
-        timestamp: new Date().toLocaleString(),
-        count: urlList.length,
-        status: 'completed'
-      }, ...prev]);
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text };
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || 'Failed to upload URLs');
+      }
+
+      setResult({
+        success: true,
+        message: data.message || 'URLs processed successfully!',
+        count: urlList.length
+      });
 
       setUrls('');
     } catch (error) {
       setResult({
         success: false,
-        message: 'Failed to upload URLs. Please try again.'
+        message: error instanceof Error ? error.message : 'Failed to upload URLs. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -202,6 +220,17 @@ function AdminUploadContent() {
                             High priority processing
                           </span>
                         </label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={resetExisting}
+                            onChange={(e) => setResetExisting(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 focus:ring-2"
+                          />
+                          <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
+                            Reset existing URLs to pending status
+                          </span>
+                        </label>
                       </div>
                     </div>
 
@@ -239,7 +268,7 @@ function AdminUploadContent() {
                     size="lg"
                     className="w-full"
                     disabled={isLoading || urlCount === 0}
-                    loading={isLoading}
+                    isLoading={isLoading}
                   >
                     {isLoading ? 'Uploading...' : `Upload ${urlCount} URL${urlCount !== 1 ? 's' : ''}`}
                   </Button>
@@ -256,20 +285,7 @@ function AdminUploadContent() {
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Upload Statistics</h3>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Today</span>
-                    <Badge variant="primary" size="sm">87 URLs</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">This Week</span>
-                    <Badge variant="secondary" size="sm">342 URLs</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Total</span>
-                    <Badge variant="success" size="sm">1,247 URLs</Badge>
-                  </div>
-                </div>
+                <DashboardStats variant="upload" />
               </CardContent>
             </Card>
 
@@ -282,26 +298,7 @@ function AdminUploadContent() {
                 </h3>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {uploadHistory.slice(0, 5).map((upload) => (
-                    <div key={upload.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {upload.count} URLs
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {upload.timestamp}
-                        </p>
-                      </div>
-                      <Badge 
-                        variant={upload.status === 'completed' ? 'success' : 'danger'} 
-                        size="sm"
-                      >
-                        {upload.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                <UploadHistory limit={5} />
               </CardContent>
             </Card>
 
