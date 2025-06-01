@@ -7,7 +7,7 @@ for user management, authentication, content management, and labeling.
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -108,15 +108,12 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-# Root endpoint
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """Root endpoint serving basic info"""
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "title": "GenAI Content Labeling System",
-        "description": "API for AI content detection and labeling"
-    })
+# Root endpoint - redirect to frontend
+@app.get("/")
+async def root():
+    """Root endpoint redirecting to frontend application"""
+    frontend_url = os.getenv("FRONTEND_URL", "https://genai-content-labeling-system-frontend.onrender.com")
+    return RedirectResponse(url=frontend_url, status_code=302)
 
 # Authentication Endpoints
 @app.post("/auth/login", response_model=LoginResponse)
