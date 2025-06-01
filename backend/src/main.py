@@ -47,8 +47,15 @@ logger = logging.getLogger(__name__)
 
 # Environment variables
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3001,http://frontend:3001").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3001,https://genai-content-labeling-system-frontend.onrender.com").split(",")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/genai_labeling.db")
+
+# Clean up ALLOWED_ORIGINS (remove whitespace and empty strings)
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
+
+# Log CORS configuration for debugging
+logger.info(f"🌐 CORS Configuration:")
+logger.info(f"   Allowed Origins: {ALLOWED_ORIGINS}")
 
 def initialize_database():
     """
