@@ -21,9 +21,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <AuthProvider>
       <ApiKeyProvider>
-        <AuthenticatedLayout>
-          {children}
-        </AuthenticatedLayout>
+        <ThemeProvider defaultTheme="system" storageKey="ui-theme">
+          <AuthenticatedLayout>
+            {children}
+          </AuthenticatedLayout>
+        </ThemeProvider>
       </ApiKeyProvider>
     </AuthProvider>
   );
