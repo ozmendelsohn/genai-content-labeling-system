@@ -57,13 +57,12 @@ class User(Base):
         profile_image_url: URL to user's profile image
         bio: User biography/description
         preferences: JSON field for user preferences
-        gemini_api_key: Encrypted Gemini AI API key for content analysis
     """
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(255), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.LABELER, nullable=False)
@@ -84,9 +83,6 @@ class User(Base):
     profile_image_url = Column(String(500))
     bio = Column(Text)
     preferences = Column(Text)  # JSON string for user preferences
-    
-    # AI Integration
-    gemini_api_key = Column(String(255), nullable=True)  # Encrypted API key storage
     
     # Relationships
     content_items = relationship("ContentItem", back_populates="assigned_user")

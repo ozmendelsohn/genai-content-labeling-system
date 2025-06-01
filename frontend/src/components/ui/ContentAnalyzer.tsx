@@ -1,38 +1,27 @@
 /**
  * Content Analyzer Component
  * 
- * A component for analyzing web content using Gemini AI and displaying
- * AI/Human classification results with confidence scores and indicators.
+ * A component for analyzing website content using AI with frontend-managed API keys.
+ * The API key is retrieved from frontend context and sent with analysis requests.
  */
 
 'use client';
 
 import React, { useState } from 'react';
+import { useApiKey } from '@/contexts/ApiKeyContext';
 import { cn } from '@/lib/design-system';
+import { Card } from './Card';
 import Input from './Input';
 import Button from './Button';
-import { Card } from './Card';
-import { 
-  MagnifyingGlassIcon, 
-  SparklesIcon, 
+import {
+  MagnifyingGlassIcon,
+  SparklesIcon,
   UserIcon,
   ExclamationTriangleIcon,
-  CheckCircleIcon,
-  DocumentTextIcon,
-  ClockIcon
+  LinkIcon,
+  ClockIcon,
+  CheckBadgeIcon
 } from '@heroicons/react/24/outline';
-
-interface AIAnalysisResult {
-  classification: 'ai_generated' | 'human_created' | 'uncertain';
-  confidence_score: number;
-  ai_indicators: string[];
-  human_indicators: string[];
-  reasoning: string;
-  analysis_timestamp: string;
-  model_used: string;
-  word_count_analyzed: number;
-  error?: string;
-}
 
 interface ContentExtractionResult {
   title: string;
@@ -40,6 +29,16 @@ interface ContentExtractionResult {
   content_text: string;
   word_count: number;
   error?: string;
+}
+
+interface AIAnalysisResult {
+  classification: string;
+  confidence_score: number;
+  ai_indicators: string[];
+  human_indicators: string[];
+  reasoning: string;
+  detected_patterns?: string;
+  analysis_timestamp: string;
 }
 
 interface CompleteAnalysisResult {
@@ -65,22 +64,22 @@ interface ContentAnalysisResponse {
 interface ContentAnalyzerProps {
   className?: string;
   onContentAnalyzed?: (result: CompleteAnalysisResult) => void;
-  hasApiKey?: boolean;
 }
 
 const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
   className,
-  onContentAnalyzed,
-  hasApiKey = false
+  onContentAnalyzed
 }) => {
   const [url, setUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<CompleteAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { apiKey, hasApiKey } = useApiKey();
+
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim() || !hasApiKey) return;
+    if (!url.trim() || !hasApiKey || !apiKey) return;
 
     try {
       setAnalyzing(true);
@@ -92,7 +91,8 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('/api/ai/analyze-url', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/ai/analyze-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +100,8 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
         },
         body: JSON.stringify({ 
           url: url.trim(),
-          use_ai_analysis: true 
+          use_ai_analysis: true,
+          api_key: apiKey
         }),
       });
 
@@ -163,6 +164,9 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
         <p className="text-gray-600 dark:text-gray-400 mb-4">
           Configure your Gemini API key to enable automatic content analysis
         </p>
+        <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
+          <p>🔒 Your API key will be stored securely in your browser and never saved on our servers.</p>
+        </div>
       </div>
     );
   }
@@ -176,6 +180,7 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
             <h3 className="text-lg font-medium text-slate-900 dark:text-white">
               AI Content Analysis
             </h3>
+            <CheckBadgeIcon className="w-5 h-5 text-green-500" title="API Key Configured" />
           </div>
 
           <form onSubmit={handleAnalyze} className="space-y-4">
@@ -217,125 +222,95 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
       </Card>
 
       {result && (
-        <div className="space-y-4">
-          {/* Content Information */}
-          <Card>
-            <div className="p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <DocumentTextIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                <h4 className="text-lg font-medium text-slate-900 dark:text-white">
-                  Content Information
-                </h4>
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Title
-                  </label>
-                  <p className="text-sm text-slate-900 dark:text-white">
-                    {result.content_extraction.title || 'No title found'}
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Description
-                  </label>
-                  <p className="text-sm text-slate-900 dark:text-white">
-                    {result.content_extraction.description || 'No description found'}
-                  </p>
-                </div>
-                
-                <div className="flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400">
-                  <span>Words: {result.content_extraction.word_count}</span>
-                  <span>•</span>
-                  <span className="flex items-center">
-                    <ClockIcon className="w-4 h-4 mr-1" />
-                    {new Date(result.ai_analysis.analysis_timestamp).toLocaleString()}
-                  </span>
-                </div>
-              </div>
+        <Card>
+          <div className="p-6">
+            <div className="flex items-center space-x-2 mb-4">
+              <LinkIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <h4 className="text-lg font-medium text-slate-900 dark:text-white">
+                Analysis Results
+              </h4>
             </div>
-          </Card>
 
-          {/* AI Analysis Results */}
-          <Card>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-medium text-slate-900 dark:text-white">
-                  AI Analysis Results
-                </h4>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {result.ai_analysis.model_used}
-                </span>
+            <div className="space-y-4">
+              {/* URL and Title */}
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Analyzed URL</p>
+                <p className="text-sm font-mono bg-slate-100 dark:bg-slate-800 rounded px-3 py-2 break-all">
+                  {result.url}
+                </p>
+                {result.content_extraction.title && (
+                  <p className="text-sm font-medium text-slate-900 dark:text-white mt-2">
+                    {result.content_extraction.title}
+                  </p>
+                )}
               </div>
 
-              {/* Classification Result */}
-              <div className={cn(
-                "p-4 rounded-lg border mb-4",
-                getClassificationColor(result.ai_analysis.classification)
-              )}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {getClassificationIcon(result.ai_analysis.classification)}
-                    <span className="font-medium">
+              {/* Classification */}
+              <div className={cn("p-4 rounded-lg border flex items-center space-x-3", getClassificationColor(result.ai_analysis.classification))}>
+                {getClassificationIcon(result.ai_analysis.classification)}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-medium">
                       {formatClassification(result.ai_analysis.classification)}
+                    </h5>
+                    <span className="text-sm font-mono">
+                      {result.ai_analysis.confidence_score}% confidence
                     </span>
                   </div>
-                  <div className="text-sm font-medium">
-                    {result.ai_analysis.confidence_score}% confidence
-                  </div>
+                  {result.ai_analysis.reasoning && (
+                    <p className="text-sm mt-1 opacity-90">
+                      {result.ai_analysis.reasoning}
+                    </p>
+                  )}
                 </div>
-              </div>
-
-              {/* Reasoning */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  AI Reasoning
-                </label>
-                <p className="text-sm text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
-                  {result.ai_analysis.reasoning}
-                </p>
               </div>
 
               {/* Indicators */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {result.ai_analysis.ai_indicators.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-purple-700 dark:text-purple-300 mb-2">
-                      AI Indicators
-                    </label>
-                    <ul className="space-y-1">
-                      {result.ai_analysis.ai_indicators.map((indicator, index) => (
-                        <li key={index} className="text-sm text-slate-700 dark:text-slate-300 flex items-start">
-                          <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                          {indicator}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              {(result.ai_analysis.ai_indicators.length > 0 || result.ai_analysis.human_indicators.length > 0) && (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {result.ai_analysis.ai_indicators.length > 0 && (
+                    <div>
+                      <h6 className="text-sm font-medium text-slate-900 dark:text-white mb-2">
+                        AI Indicators ({result.ai_analysis.ai_indicators.length})
+                      </h6>
+                      <div className="space-y-1">
+                        {result.ai_analysis.ai_indicators.map((indicator, index) => (
+                          <div key={index} className="text-xs bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 px-2 py-1 rounded">
+                            {indicator}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {result.ai_analysis.human_indicators.length > 0 && (
+                    <div>
+                      <h6 className="text-sm font-medium text-slate-900 dark:text-white mb-2">
+                        Human Indicators ({result.ai_analysis.human_indicators.length})
+                      </h6>
+                      <div className="space-y-1">
+                        {result.ai_analysis.human_indicators.map((indicator, index) => (
+                          <div key={index} className="text-xs bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                            {indicator}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {result.ai_analysis.human_indicators.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-green-700 dark:text-green-300 mb-2">
-                      Human Indicators
-                    </label>
-                    <ul className="space-y-1">
-                      {result.ai_analysis.human_indicators.map((indicator, index) => (
-                        <li key={index} className="text-sm text-slate-700 dark:text-slate-300 flex items-start">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                          {indicator}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              {/* Content Info */}
+              <div className="flex items-center space-x-4 text-xs text-slate-500 dark:text-slate-400 border-t pt-3">
+                <span className="flex items-center space-x-1">
+                  <ClockIcon className="w-3 h-3" />
+                  <span>{new Date(result.ai_analysis.analysis_timestamp).toLocaleString()}</span>
+                </span>
+                <span>{result.content_extraction.word_count} words analyzed</span>
               </div>
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       )}
     </div>
   );

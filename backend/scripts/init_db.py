@@ -176,11 +176,11 @@ def main():
         # Create database tables
         engine = create_database()
         
-        # # Create default admin user
-        # create_default_admin(engine)
+        # Create default admin user
+        create_default_admin(engine)
         
-        # # Create sample data
-        # create_sample_data(engine)
+        # Create sample data
+        create_sample_data(engine)
         
         logger.info("🎉 Database initialization completed successfully!")
         logger.info("")

@@ -1,8 +1,8 @@
 /**
- * Login Page
+ * Signup Page
  * 
- * Dedicated login page for the GenAI Content Labeling System
- * with modern design and authentication handling.
+ * Dedicated signup page for the GenAI Content Labeling System
+ * with modern design and role selection.
  */
 
 'use client';
@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import AuthContainer from '@/components/auth/AuthContainer';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function LoginPage() {
+export default function SignupPage() {
   const { login } = useAuth();
   const router = useRouter();
 
@@ -21,5 +21,5 @@ export default function LoginPage() {
     router.push('/');
   };
 
-  return <AuthContainer onLoginSuccess={handleLoginSuccess} initialMode="login" />;
+  return <AuthContainer onLoginSuccess={handleLoginSuccess} initialMode="signup" />;
 } 

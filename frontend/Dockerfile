@@ -14,6 +14,10 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+
 # Build the Next.js application
 RUN npm run build
 
@@ -41,6 +45,10 @@ RUN adduser -S nextjs -u 1001
 # Change ownership of the app directory
 RUN chown -R nextjs:nodejs /app
 USER nextjs
+
+# Set runtime environment variables with defaults
+ENV NODE_ENV=production
+ENV NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 EXPOSE 3000
 

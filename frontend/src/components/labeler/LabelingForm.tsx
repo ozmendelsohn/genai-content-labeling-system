@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useApiKey } from '@/contexts/ApiKeyContext';
 import { loadConfig, getConfigValue, IndicatorItem } from '../../lib/config';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
@@ -46,6 +47,7 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
+  const { apiKey } = useApiKey();
   
   // State for dynamically loaded indicators
   const [aiIndicators, setAiIndicators] = useState<IndicatorItem[]>(defaultAiIndicators);
@@ -175,6 +177,11 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
       setPreselectionMessage('Authentication required for AI analysis');
       return;
     }
+    
+    if (!apiKey) {
+      setPreselectionMessage('Gemini API key required for AI analysis. Please configure your API key first.');
+      return;
+    }
 
     setIsPreselecting(true);
     setPreselectionMessage('Analyzing content with AI...');
@@ -187,6 +194,9 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          api_key: apiKey
+        }),
       });
 
       const result = await response.json();
@@ -196,13 +206,19 @@ export default function LabelingForm({ task, onSubmitSuccess, currentLabelerId }
       }
 
       if (result.success) {
-        // Pre-select the indicators suggested by AI
-        const aiIndicatorIds = result.preselected_indicators?.ai_indicators || [];
-        const humanIndicatorIds = result.preselected_indicators?.human_indicators || [];
+        // Pre-select the indicators suggested by AI - updated structure
+        const aiIndicatorIds = result.preselected_ai_indicators || [];
+        const humanIndicatorIds = result.preselected_human_indicators || [];
         
         setSelectedAiIndicators(aiIndicatorIds);
         setSelectedHumanIndicators(humanIndicatorIds);
-        setAiAnalysis(result.ai_analysis);
+        
+        // Store AI analysis data for display
+        setAiAnalysis({
+          classification: result.classification,
+          confidence_score: result.confidence_score,
+          reasoning: result.reasoning
+        });
         
         // Note: We don't auto-set the label value to avoid biasing the user's decision
         

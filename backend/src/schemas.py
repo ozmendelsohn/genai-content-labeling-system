@@ -34,7 +34,7 @@ class LabelClassificationEnum(str, Enum):
 class UserBase(BaseModel):
     """Base user schema with common fields"""
     username: str = Field(..., min_length=3, max_length=50, description="Unique username")
-    email: EmailStr = Field(..., description="User's email address")
+    email: Optional[EmailStr] = Field(None, description="User's email address (optional)")
     full_name: str = Field(..., min_length=1, max_length=255, description="User's full name")
     role: UserRoleEnum = Field(default=UserRoleEnum.LABELER, description="User role")
     bio: Optional[str] = Field(None, max_length=1000, description="User biography")
@@ -47,8 +47,51 @@ class UserBase(BaseModel):
             raise ValueError('Username must contain only alphanumeric characters, underscores, or hyphens')
         return v.lower()
 
+class UserSignup(BaseModel):
+    """Schema for user self-registration/signup"""
+    username: str = Field(..., min_length=3, max_length=50, description="Unique username")
+    full_name: str = Field(..., min_length=1, max_length=255, description="User's full name")
+    password: str = Field(..., min_length=8, max_length=128, description="User password")
+    confirm_password: str = Field(..., description="Password confirmation")
+    role: UserRoleEnum = Field(..., description="Desired user role (labeler or admin)")
+
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if not v.replace('_', '').replace('-', '').isalnum():
+            raise ValueError('Username must contain only alphanumeric characters, underscores, or hyphens')
+        return v.lower()
+
+    @field_validator('confirm_password')
+    @classmethod
+    def passwords_match(cls, v, values):
+        if 'password' in values.data and v != values.data['password']:
+            raise ValueError('Passwords do not match')
+        return v
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v):
+        # Allow only labeler and admin roles for signup
+        if v not in [UserRoleEnum.LABELER, UserRoleEnum.ADMIN]:
+            raise ValueError('Only labeler and admin roles are allowed for signup')
+        return v
+
 class UserCreate(UserBase):
-    """Schema for creating a new user"""
+    """Schema for creating a new user (Admin only)"""
     password: str = Field(..., min_length=8, max_length=128, description="User password")
     confirm_password: str = Field(..., description="Password confirmation")
 
@@ -364,20 +407,15 @@ class TaskResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 # AI Analysis Schemas
-class GeminiAPIKeyRequest(BaseModel):
-    """Schema for setting Gemini API key"""
-    api_key: str = Field(..., min_length=10, description="Google AI Studio API key")
-
-class GeminiAPIKeyResponse(BaseModel):
-    """Schema for API key validation response"""
-    valid: bool
-    message: str
-    has_api_key: bool = False
-
 class ContentAnalysisRequest(BaseModel):
     """Schema for requesting content analysis"""
     url: str = Field(..., description="URL to analyze")
     use_ai_analysis: bool = Field(default=True, description="Whether to use AI analysis")
+    api_key: str = Field(..., description="Gemini API key for analysis")
+
+class AIIndicatorPreselectionRequest(BaseModel):
+    """Schema for requesting AI indicator preselection"""
+    api_key: str = Field(..., description="Gemini API key for analysis")
 
 class AIAnalysisResult(BaseModel):
     """Schema for AI analysis results"""
@@ -421,8 +459,8 @@ class ContentItemCreateWithAI(ContentItemCreate):
 
 # Enhanced User Schemas for API Key Management
 class UserUpdateWithAI(UserUpdate):
-    """Enhanced user update schema with AI settings"""
-    gemini_api_key: Optional[str] = Field(None, description="Gemini AI API key")
+    """Enhanced user update schema (API key management moved to frontend)"""
+    pass  # No longer includes gemini_api_key
 
 class UserResponseWithAI(UserResponse):
     """Enhanced user response with AI capabilities"""
