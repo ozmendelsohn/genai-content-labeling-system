@@ -108,7 +108,30 @@ graph TD
 *   **Export Functionality:** CSV export with configurable date ranges and comprehensive labeling data.
 *   **Real-time Dashboard:** Live updating admin dashboard with key performance indicators and system health metrics.
 
-## 8. Production Readiness Patterns
+## 8. Form Validation and User Feedback Patterns
+
+*   **Client-Side Validation Strategy:**
+    *   Real-time validation with immediate feedback for user input
+    *   Custom validation rules with regex patterns for complex requirements
+    *   Error state management using React useState for individual form fields
+    *   Progressive validation clearing as users correct their input
+*   **User Experience Patterns:**
+    *   **Error Message Display**: Consistent error messaging using `errorMessage` prop in Input components
+    *   **Visual Feedback**: Red-colored error text positioned below input fields for clear association
+    *   **Icon Integration**: Proper `leftIcon` positioning for visual context and improved UX
+    *   **Loading States**: Disabled form elements and loading indicators during submission
+*   **Validation Rule Implementation:**
+    *   **Username Validation**: Minimum length + character restrictions using regex patterns
+    *   **Password Complexity**: Multi-factor validation (length, uppercase, lowercase, digits)
+    *   **Confirmation Fields**: Real-time matching validation for password confirmation
+    *   **Required Field Validation**: Clear messaging for empty required fields
+*   **Component Integration Patterns:**
+    *   Reusable Input component with built-in error display capabilities
+    *   Consistent prop naming (`errorMessage`, `leftIcon`) across all form components
+    *   State management pattern for validation errors using Record<string, string>
+    *   Form submission prevention until all validation passes
+
+## 9. Production Readiness Patterns
 
 *   **Security Hardening:** Non-root Docker users, optimized image sizes, proper secret management, AND zero API key persistence.
 *   **Scalability Considerations:** Component-based architecture ready for horizontal scaling, database ready for migration to PostgreSQL.
