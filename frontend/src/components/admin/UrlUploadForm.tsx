@@ -107,7 +107,7 @@ export default function UrlUploadForm() {
             name="urls"
             rows={10}
             className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 shadow-sm-light"
-            placeholder="http://example.com/article1\nhttps://another.example/blog-post"
+            placeholder="https://website1.com/article&#10;https://blog.company.com/post"
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
             required

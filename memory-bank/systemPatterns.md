@@ -2,39 +2,51 @@
 
 ## 1. System Architecture
 
-The system follows a modern containerized client-server architecture with enterprise-grade security, enhanced analytics, and production-ready deployment:
+The system follows a modern containerized client-server architecture with enterprise-grade security, enhanced analytics, production cloud deployment on Render.com:
 
-*   **Frontend (Client):** A production-ready Next.js single-page application (SPA) running in the user's browser. It interacts with the backend via HTTP API calls, includes comprehensive admin tools with real-time analytics, AND manages API keys securely in browser-only storage.
-*   **Backend (Server):** A FastAPI (Python) application providing a RESTful API with enhanced analytics endpoints and zero API key storage for enhanced security. It handles business logic, database interactions, performance tracking, and data export capabilities.
-*   **Database:** An SQLite database stores application data (URLs, tasks, labels, users) with proper persistence across container restarts. API keys are intentionally NOT stored for security.
-*   **Containerization:** Both frontend and backend applications are containerized using production-grade Docker builds and orchestrated with Docker Compose for reliable deployment.
+*   **Frontend (Client):** A production-ready Next.js single-page application (SPA) deployed on Render.com and running in users' browsers. It interacts with the backend via HTTP API calls, includes comprehensive admin tools with real-time analytics, AND manages API keys securely in browser-only storage.
+*   **Backend (Server):** A FastAPI (Python) application deployed on Render.com providing a RESTful API with enhanced analytics endpoints and zero API key storage for enhanced security. It handles business logic, database interactions, performance tracking, and data export capabilities.
+*   **Database:** PostgreSQL database (production) / SQLite (development) stores application data (URLs, tasks, labels, users) with proper persistence and cloud backup. API keys are intentionally NOT stored for security.
+*   **Cloud Infrastructure:** Both frontend and backend applications are deployed on Render.com using Docker containers with automated CI/CD and proper environment management.
 *   **Security Model:** API keys maintained exclusively in frontend localStorage, passed with requests but never persisted server-side.
+*   **CORS Configuration:** Proper cross-origin resource sharing setup for production frontend-backend communication across different domains.
 
 ```mermaid
 graph TD
-    User[User Browser] -->|HTTPS| FE[Frontend: Next.js on Node.js]
-    FE -->|HTTP API Calls + API Key| BE[Backend: FastAPI on Python]
-    BE --> DB[Database: SQLite]
+    User[User Browser] -->|HTTPS| FE[Frontend: Next.js on Render.com]
+    FE -->|HTTP API Calls + API Key| BE[Backend: FastAPI on Render.com]
+    BE --> DB[Database: PostgreSQL on Render]
     BE --> Analytics[Analytics Engine]
     Analytics --> Export[CSV Export]
     
     FE --> LocalStorage[Browser localStorage<br/>🔒 API Keys Only]
     
-    subgraph Docker Environment
-        direction LR
-        subgraph Frontend Container
+    subgraph Render.com Cloud
+        direction TB
+        subgraph Frontend Service
             FE
             UI[Modern UI Components]
             Dashboard[Admin Dashboard]
             APIContext[API Key Context]
         end
-        subgraph Backend Container
+        subgraph Backend Service
             BE
             API[Core API Endpoints]
             Analytics
             AI[Gemini AI Service<br/>🔒 No Key Storage]
         end
-        DB -- Volume Mount --> HostFS[(Host File System)]
+        subgraph Database Service
+            DB
+            Backup[Automated Backups]
+        end
+    end
+    
+    subgraph Local Development
+        LocalFE[Frontend: localhost:3001]
+        LocalBE[Backend: localhost:8000]
+        LocalDB[SQLite Database]
+        LocalFE --> LocalBE
+        LocalBE --> LocalDB
     end
 ```
 
