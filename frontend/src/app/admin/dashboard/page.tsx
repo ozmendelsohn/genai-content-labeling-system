@@ -242,11 +242,7 @@ function AdminDashboardContent() {
       
       const activity: UserActivity = {
         active_labelers: dashboardData.system_stats.active_users,
-        top_labelers: [
-          { username: 'labeler1', labels_count: 45, labels_today: 8 },
-          { username: 'labeler2', labels_count: 32, labels_today: 5 },
-          { username: 'labeler3', labels_count: 28, labels_today: 3 }
-        ],
+        top_labelers: [], // Will be populated from real API data
         recent_activity: dashboardData.recent_activity
       };
       

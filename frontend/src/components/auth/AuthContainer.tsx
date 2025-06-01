@@ -231,20 +231,6 @@ function LoginFormContent({ onLoginSuccess }: { onLoginSuccess: (token: string, 
           )}
         </button>
       </form>
-
-      <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-        <p className="text-center text-sm text-slate-600 dark:text-slate-400 mb-2">
-          Default admin credentials:
-        </p>
-        <p className="text-center text-sm">
-          <span className="text-slate-700 dark:text-slate-300">Username:</span>{' '}
-          <span className="text-blue-600 dark:text-blue-400 font-mono">admin</span>
-        </p>
-        <p className="text-center text-sm">
-          <span className="text-slate-700 dark:text-slate-300">Password:</span>{' '}
-          <span className="text-blue-600 dark:text-blue-400 font-mono">admin123!</span>
-        </p>
-      </div>
     </>
   );
 } 

@@ -81,91 +81,38 @@ def create_default_admin(engine):
         raise
 
 def create_sample_data(engine):
-    """Create some sample data for testing"""
+    """Initialize basic system metrics for production"""
     try:
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         db = SessionLocal()
         
-        # Check if sample data already exists
-        existing_content = db.query(ContentItem).first()
-        if existing_content:
-            logger.info("ℹ️  Sample data already exists, skipping creation")
+        # Check if system metrics already exist
+        existing_metrics = db.query(SystemMetrics).first()
+        if existing_metrics:
+            logger.info("ℹ️  System metrics already exist, skipping creation")
             db.close()
             return
         
-        # Create sample labeler user
-        labeler_user = User(
-            username="labeler1",
-            email="labeler1@genai-labeler.com",
-            full_name="Sample Labeler",
-            role=UserRole.LABELER,
-            is_active=True,
-            is_verified=True
-        )
-        labeler_user.set_password("labeler123!")
-        db.add(labeler_user)
-        db.commit()
-        db.refresh(labeler_user)
-        
-        # Create sample viewer user
-        viewer_user = User(
-            username="viewer1",
-            email="viewer1@genai-labeler.com",
-            full_name="Sample Viewer",
-            role=UserRole.VIEWER,
-            is_active=True,
-            is_verified=True
-        )
-        viewer_user.set_password("viewer123!")
-        db.add(viewer_user)
-        db.commit()
-        db.refresh(viewer_user)
-        
-        # Create sample content items
-        sample_urls = [
-            "https://example.com/article1",
-            "https://example.com/article2",
-            "https://example.com/article3",
-            "https://example.com/blog-post",
-            "https://example.com/news-article"
+        # Create basic system metrics (no sample users or content)
+        initial_metrics = [
+            SystemMetrics(metric_name="total_users", metric_value=1.0),  # Only admin user
+            SystemMetrics(metric_name="total_content_items", metric_value=0.0),  # No sample content
+            SystemMetrics(metric_name="system_accuracy", metric_value=0.0),  # No data yet
+            SystemMetrics(metric_name="labels_today", metric_value=0.0),  # No labels yet
         ]
         
-        content_items = []
-        for i, url in enumerate(sample_urls):
-            content_item = ContentItem(
-                url=url,
-                title=f"Sample Article {i+1}",
-                description=f"This is a sample article for testing purposes - Article {i+1}",
-                priority=3,
-                assigned_user_id=labeler_user.id if i % 2 == 0 else None
-            )
-            content_items.append(content_item)
-            db.add(content_item)
-        
-        db.commit()
-        
-        # Create sample system metrics
-        sample_metrics = [
-            SystemMetrics(metric_name="total_users", metric_value=3.0),
-            SystemMetrics(metric_name="total_content_items", metric_value=len(sample_urls)),
-            SystemMetrics(metric_name="system_accuracy", metric_value=89.3),
-            SystemMetrics(metric_name="labels_today", metric_value=15.0),
-        ]
-        
-        for metric in sample_metrics:
+        for metric in initial_metrics:
             db.add(metric)
         
         db.commit()
         
-        logger.info("✅ Sample data created successfully!")
-        logger.info(f"   Created {len(sample_urls)} sample content items")
-        logger.info("   Created sample labeler user: labeler1 / labeler123!")
-        logger.info("   Created sample viewer user: viewer1 / viewer123!")
+        logger.info("✅ Basic system metrics initialized!")
+        logger.info("   System ready for production use")
         
         db.close()
         
     except Exception as e:
-        logger.error(f"❌ Error creating sample data: {e}")
+        logger.error(f"❌ Error creating system metrics: {e}")
         raise
 
 def main():
@@ -179,7 +126,7 @@ def main():
         # Create default admin user
         create_default_admin(engine)
         
-        # Create sample data
+        # Initialize basic system metrics
         create_sample_data(engine)
         
         logger.info("🎉 Database initialization completed successfully!")
@@ -187,12 +134,17 @@ def main():
         logger.info("📋 Summary:")
         logger.info("   • Database tables created")
         logger.info("   • Default admin user created (admin / admin123!)")
-        logger.info("   • Sample labeler created (labeler1 / labeler123!)")
-        logger.info("   • Sample viewer created (viewer1 / viewer123!)")
-        logger.info("   • Sample content items created")
+        logger.info("   • System metrics initialized")
+        logger.info("   • System ready for production use")
         logger.info("")
         logger.info("⚠️  Security Notice:")
-        logger.info("   Please change all default passwords before production use!")
+        logger.info("   Please change the default admin password after first login!")
+        logger.info("")
+        logger.info("🚀 Next Steps:")
+        logger.info("   1. Log in as admin (admin / admin123!)")
+        logger.info("   2. Change the default password")
+        logger.info("   3. Create labeler and viewer users as needed")
+        logger.info("   4. Upload URLs for labeling tasks")
         
     except Exception as e:
         logger.error(f"💥 Database initialization failed: {e}")
