@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./scripts:/app/scripts
+      - ./data:/app/data
+      - ./frontend/templates:/app/templates
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - PYTHONPATH=/app/src
+      - DATABASE_URL=sqlite:///./data/genai_labeling.db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8000
+      - NODE_ENV=production
+    depends_on:
+      - backend
