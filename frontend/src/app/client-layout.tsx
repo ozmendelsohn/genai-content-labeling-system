@@ -10,6 +10,7 @@
 import React, { ReactNode } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ApiKeyProvider } from '@/contexts/ApiKeyContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import AuthenticatedLayout from './authenticated-layout';
 
 interface ClientLayoutProps {

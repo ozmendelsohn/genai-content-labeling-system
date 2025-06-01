@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/design-system';
 import { useAuth } from '@/contexts/AuthContext';
 import Badge from '@/components/ui/Badge';
+import { ThemeToggle } from './ui/ThemeToggle';
 
 // Icons
 const MenuIcon = () => (
@@ -201,6 +202,7 @@ export default function Navbar() {
 
           {/* User Menu */}
           <div className="hidden md:flex items-center space-x-4">
+            <ThemeToggle />
             {/* Status Indicator */}
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
