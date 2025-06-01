@@ -173,7 +173,7 @@ function AdminUploadContent() {
                       <textarea
                         value={urls}
                         onChange={(e) => setUrls(e.target.value)}
-                        placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3"
+                        placeholder="https://website1.com/article&#10;https://blog.company.com/post&#10;https://news.site.com/story"
                         className="w-full h-48 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"
                         disabled={isLoading}
                       />

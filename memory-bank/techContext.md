@@ -31,36 +31,45 @@
 
 ## 2. Development Setup
 
-*   **Production-Ready Local Environment:** Docker and Docker Compose with optimized builds
+*   **Production Cloud Environment:** Successfully deployed on Render.com with Docker containers
+*   **Production URLs:**
+    *   Frontend: https://genai-content-labeling-system-frontend.onrender.com
+    *   Backend: https://genai-content-labeling-system.onrender.com
+*   **Local Development Environment:** Docker and Docker Compose with optimized builds
 *   **Code Editor:** Any modern code editor (e.g., VS Code with relevant extensions for Python, TypeScript, Docker)
 *   **Terminal/Shell:** Standard shell (bash, zsh, etc.) for running Docker commands and Git
+*   **Cloud Deployment Requirements:**
+    1. Render.com account for hosting
+    2. PostgreSQL database service on Render
+    3. Environment variables configured for production
+    4. Docker deployment with proper build context
 *   **Getting Started (Enhanced):** 
-    1. Clone repository with all production configurations
-    2. Run `docker-compose up --build` for optimized production builds
-    3. Frontend available at http://localhost:3001 with modern UI
-    4. Backend available at http://localhost:8000 with analytics endpoints
-    5. Database persistence automatically configured
-*   **Backend Code Structure:** Main Python modules in `backend/src/` with proper Docker PYTHONPATH configuration
+    1. **Production**: Access live system at production URLs above
+    2. **Local Development**: Clone repository → Run `docker-compose up --build` → Frontend at http://localhost:3001, Backend at http://localhost:8000
+    3. **Database**: Automatic initialization in both environments
+*   **Backend Code Structure:** Main Python modules in `backend/src/` with proper Docker PYTHONPATH configuration for both environments
 *   **Frontend Structure:** Production-ready Next.js build with optimized assets and security hardening
 
 ## 3. Technical Constraints
 
-*   **PoC Focus Enhanced:** System now exceeds PoC requirements with production-ready features
-*   **SQLite Persistence:** Enhanced with proper volume mounting for reliable data persistence
-*   **Analytics Performance:** Optimized SQL queries for real-time performance tracking
-*   **Docker Production:** Multi-stage builds with security hardening and optimized image sizes
-*   **Dependency Management:** Poetry for backend, npm for frontend with production optimization
+*   **Production Environment Enhanced:** System deployed and operational in cloud infrastructure (Render.com)
+*   **Database Flexibility:** PostgreSQL for production, SQLite for development with seamless switching
+*   **CORS Configuration:** Proper cross-origin setup for production frontend-backend communication
+*   **Analytics Performance:** Optimized SQL queries for real-time performance tracking in production
+*   **Docker Production:** Multi-stage builds with security hardening and cloud deployment optimization
+*   **Environment Management:** Separate configuration for development and production environments
 
 ## 4. Dependencies
 
 *   **Backend (Enhanced Dependencies - confirmed via pyproject.toml):**
-    *   `fastapi` - Core web framework
-    *   `uvicorn[standard]` - Production ASGI server
-    *   `sqlalchemy` - Database ORM with analytics queries
+    *   `fastapi` - Core web framework (production-ready)
+    *   `uvicorn[standard]` - Production ASGI server for cloud deployment
+    *   `sqlalchemy` - Database ORM with PostgreSQL and SQLite support
     *   `pydantic` - Data validation with analytics models
-    *   `google-genai = "^1.16.1"` - Gemini AI integration
+    *   `google-genai = "^1.16.1"` - Gemini AI integration working in production
     *   `requests` - Web scraping for AI service
     *   `beautifulsoup4` - HTML parsing for content analysis
+    *   `psycopg2-binary` - PostgreSQL adapter for production database (added for cloud deployment)
     *   `bcrypt` - Password hashing for authentication
     *   `python-jose[cryptography]` - JWT token management
     *   `python-multipart` - Form data handling
@@ -68,12 +77,18 @@
     *   `pytest` - Testing framework
 
 *   **Frontend (Production Dependencies - from `package.json`):**
-    *   `next` - React framework with production optimization
-    *   `react`, `react-dom` - UI library
-    *   `typescript` - Type safety
-    *   `tailwindcss` - Utility-first CSS framework
+    *   `next` - React framework with production optimization and cloud deployment
+    *   `react`, `react-dom` - UI library optimized for production
+    *   `typescript` - Type safety maintained in production builds
+    *   `tailwindcss` - Utility-first CSS framework with production optimization
     *   `js-yaml` and `@types/js-yaml` - Configuration parsing
-    *   Associated `@types/*` packages for TypeScript safety
+    *   Associated `@types/*` packages for TypeScript safety in production
+
+*   **Production Infrastructure:**
+    *   **Render.com**: Cloud hosting platform for both frontend and backend services
+    *   **PostgreSQL**: Production database with automated backups and scaling
+    *   **Docker**: Containerization for consistent deployment across environments
+    *   **Environment Variables**: Secure configuration management for production secrets
 
 ## 5. Tool Usage Patterns
 
