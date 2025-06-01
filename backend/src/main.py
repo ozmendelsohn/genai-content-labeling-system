@@ -24,14 +24,15 @@ from database import get_db, engine, create_tables
 from models import User, ContentItem, Label, UserRole, ContentStatus, LabelClassification, Base
 from sqlalchemy import or_
 from schemas import (
-    UserCreate, UserResponse, UserUpdate, UserPasswordUpdate, UserListResponse,
+    UserCreate, UserSignup, UserResponse, UserUpdate, UserPasswordUpdate, UserListResponse,
     LoginRequest, LoginResponse, ContentItemCreate, ContentItemResponse, 
     ContentItemUpdate, ContentItemListResponse, LabelCreate, LabelResponse,
     LabelUpdate, LabelListResponse, BulkContentUpload, BulkUploadResponse,
     SystemStats, UserStats, DashboardData, PaginationParams, FilterParams,
-    SuccessResponse, ErrorResponse, GeminiAPIKeyRequest, GeminiAPIKeyResponse,
+    SuccessResponse, ErrorResponse,
     ContentAnalysisRequest, ContentAnalysisResponse, CompleteAnalysisResult,
-    ContentItemCreateWithAI, UserUpdateWithAI, UserResponseWithAI, TaskResponse
+    ContentItemCreateWithAI, UserUpdateWithAI, UserResponseWithAI, TaskResponse,
+    AIIndicatorPreselectionRequest
 )
 from auth import (
     authenticate_user, create_access_token, get_current_user, get_current_active_user,
@@ -43,6 +44,11 @@ from ai_service import create_ai_analyzer
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3001,http://frontend:3001").split(",")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/genai_labeling.db")
 
 def initialize_database():
     """
@@ -77,10 +83,10 @@ async def startup_event():
     """Initialize database and other startup tasks"""
     initialize_database()
 
-# Configure CORS
+# Configure CORS with environment variables
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://frontend:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -179,6 +185,77 @@ async def logout(
     )
     
     return SuccessResponse(message="Successfully logged out")
+
+@app.post("/auth/signup", response_model=UserResponse)
+async def signup(
+    signup_data: UserSignup,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    User self-registration endpoint
+    
+    Args:
+        signup_data: User signup data including role selection
+        request: HTTP request object
+        db: Database session
+        
+    Returns:
+        UserResponse: Created user information
+    """
+    # Check if username already exists
+    existing_user = db.query(User).filter(
+        User.username == signup_data.username.lower()
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken. Please choose a different username."
+        )
+    
+    # Create new user
+    new_user = User(
+        username=signup_data.username.lower(),
+        email=None,  # No email required for signup
+        full_name=signup_data.full_name,
+        role=UserRole[signup_data.role.value.upper()],  # Convert to proper enum
+        is_active=True,
+        is_verified=True,  # Auto-verify for now, can be changed later
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    
+    # Set password using the model's method
+    new_user.set_password(signup_data.password)
+    
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Log the signup action
+        log_user_action(
+            db=db,
+            user_id=new_user.id,
+            action="signup",
+            resource_type="user",
+            resource_id=str(new_user.id),
+            request=request,
+            details={"role": signup_data.role.value}
+        )
+        
+        logger.info(f"✅ New user registered: {new_user.username} ({new_user.role.value})")
+        
+        return UserResponse.from_orm(new_user)
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Failed to create user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account. Please try again."
+        )
 
 # User Management Endpoints
 @app.post("/users", response_model=UserResponse)
@@ -961,95 +1038,6 @@ async def export_dashboard_data(
         )
 
 # AI Integration Endpoints
-@app.post("/ai/api-key", response_model=GeminiAPIKeyResponse)
-async def set_gemini_api_key(
-    api_key_request: GeminiAPIKeyRequest,
-    request: Request,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Set and validate Gemini API key for current user
-    
-    Args:
-        api_key_request: API key request data
-        request: HTTP request object
-        current_user: Current authenticated user
-        db: Database session
-        
-    Returns:
-        GeminiAPIKeyResponse: Validation result
-    """
-    try:
-        # Create AI analyzer to validate the API key
-        ai_analyzer = create_ai_analyzer(api_key_request.api_key)
-        
-        if not ai_analyzer:
-            return GeminiAPIKeyResponse(
-                valid=False,
-                message="Failed to initialize AI analyzer with provided API key",
-                has_api_key=False
-            )
-        
-        # Validate the API key
-        validation_result = ai_analyzer.validate_api_key()
-        
-        if validation_result["valid"]:
-            # Store the API key (in production, this should be encrypted)
-            current_user.gemini_api_key = api_key_request.api_key
-            db.commit()
-            
-            # Log the action
-            log_user_action(
-                db=db,
-                user_id=current_user.id,
-                action="set_gemini_api_key",
-                resource_type="user",
-                resource_id=str(current_user.id),
-                details={"validation_successful": True},
-                request=request
-            )
-            
-            return GeminiAPIKeyResponse(
-                valid=True,
-                message="API key validated and saved successfully",
-                has_api_key=True
-            )
-        else:
-            return GeminiAPIKeyResponse(
-                valid=False,
-                message=validation_result["message"],
-                has_api_key=bool(current_user.gemini_api_key)
-            )
-    
-    except Exception as e:
-        return GeminiAPIKeyResponse(
-            valid=False,
-            message=f"API key validation failed: {str(e)}",
-            has_api_key=bool(current_user.gemini_api_key)
-        )
-
-@app.get("/ai/api-key/status", response_model=GeminiAPIKeyResponse)
-async def get_api_key_status(
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    Get current user's API key status
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        GeminiAPIKeyResponse: API key status
-    """
-    has_api_key = bool(current_user.gemini_api_key)
-    
-    return GeminiAPIKeyResponse(
-        valid=has_api_key,
-        message="API key configured" if has_api_key else "No API key configured",
-        has_api_key=has_api_key
-    )
-
 @app.post("/ai/analyze-url", response_model=ContentAnalysisResponse)
 async def analyze_url_content(
     analysis_request: ContentAnalysisRequest,
@@ -1061,7 +1049,7 @@ async def analyze_url_content(
     Analyze URL content using AI
     
     Args:
-        analysis_request: Content analysis request
+        analysis_request: Content analysis request with API key
         request: HTTP request object
         current_user: Current authenticated user with labeler permissions
         db: Database session
@@ -1069,21 +1057,14 @@ async def analyze_url_content(
     Returns:
         ContentAnalysisResponse: Analysis results
     """
-    # Check if user has API key configured
-    if not current_user.gemini_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Gemini API key not configured. Please set your API key first."
-        )
-    
     try:
-        # Create AI analyzer
-        ai_analyzer = create_ai_analyzer(current_user.gemini_api_key)
+        # Create AI analyzer with provided API key
+        ai_analyzer = create_ai_analyzer(analysis_request.api_key)
         
         if not ai_analyzer:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize AI analyzer"
+                detail="Failed to initialize AI analyzer. Please check your API key."
             )
         
         # Perform analysis
@@ -1100,7 +1081,7 @@ async def analyze_url_content(
             priority=3  # Default priority
         )
         
-        # Log the action
+        # Log the action (without API key details)
         log_user_action(
             db=db,
             user_id=current_user.id,
@@ -1143,6 +1124,7 @@ async def analyze_url_content(
 
 @app.post("/ai/preselect-indicators")
 async def preselect_indicators_for_task(
+    preselection_request: AIIndicatorPreselectionRequest,
     request: Request,
     current_user: User = Depends(require_labeler),
     db: Session = Depends(get_db)
@@ -1151,6 +1133,7 @@ async def preselect_indicators_for_task(
     Get AI-powered pre-selection of indicators for the current user's active task
     
     Args:
+        preselection_request: API key for AI analysis
         request: HTTP request object
         current_user: Current authenticated labeler user
         db: Database session
@@ -1158,13 +1141,6 @@ async def preselect_indicators_for_task(
     Returns:
         Dict: Pre-selected indicators for the current task
     """
-    # Check if user has API key configured
-    if not current_user.gemini_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Gemini API key not configured. Please set your API key first."
-        )
-    
     # Find the user's current active task
     current_task = db.query(ContentItem).filter(
         ContentItem.assigned_user_id == current_user.id,
@@ -1178,13 +1154,13 @@ async def preselect_indicators_for_task(
         )
     
     try:
-        # Create AI analyzer
-        ai_analyzer = create_ai_analyzer(current_user.gemini_api_key)
+        # Create AI analyzer with provided API key
+        ai_analyzer = create_ai_analyzer(preselection_request.api_key)
         
         if not ai_analyzer:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize AI analyzer"
+                detail="Failed to initialize AI analyzer. Please check your API key."
             )
         
         # Perform analysis
@@ -1195,7 +1171,7 @@ async def preselect_indicators_for_task(
         preselected_ai_indicators = ai_analysis.get("ai_indicators", [])
         preselected_human_indicators = ai_analysis.get("human_indicators", [])
         
-        # Log the action
+        # Log the action (without API key details)
         log_user_action(
             db=db,
             user_id=current_user.id,
@@ -1214,19 +1190,13 @@ async def preselect_indicators_for_task(
         
         return {
             "success": True,
-            "message": "Indicators pre-selected successfully",
-            "task_id": current_task.id,
-            "url": current_task.url,
-            "ai_analysis": {
-                "classification": ai_analysis.get("classification", "uncertain"),
-                "confidence_score": ai_analysis.get("confidence_score", 50),
-                "reasoning": ai_analysis.get("reasoning", ""),
-                "detected_patterns": ai_analysis.get("detected_patterns", "")
-            },
-            "preselected_indicators": {
-                "ai_indicators": preselected_ai_indicators,
-                "human_indicators": preselected_human_indicators
-            }
+            "task_url": current_task.url,
+            "classification": ai_analysis.get("classification", "uncertain"),
+            "confidence_score": ai_analysis.get("confidence_score", 0),
+            "preselected_ai_indicators": preselected_ai_indicators,
+            "preselected_human_indicators": preselected_human_indicators,
+            "reasoning": ai_analysis.get("reasoning", ""),
+            "analysis_timestamp": ai_analysis.get("analysis_timestamp")
         }
     
     except Exception as e:
@@ -1236,14 +1206,14 @@ async def preselect_indicators_for_task(
             user_id=current_user.id,
             action="ai_preselect_indicators_failed",
             resource_type="content_item",
-            resource_id=str(current_task.id) if current_task else "unknown",
+            resource_id=str(current_task.id),
             details={"error": str(e)},
             request=request
         )
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to pre-select indicators: {str(e)}"
+            detail=f"Failed to preselect indicators: {str(e)}"
         )
 
 @app.post("/content/with-ai", response_model=ContentItemResponse)
@@ -1311,38 +1281,6 @@ async def create_content_item_with_ai_analysis(
     )
     
     return ContentItemResponse.from_orm(content_item)
-
-@app.delete("/ai/api-key")
-async def remove_gemini_api_key(
-    request: Request,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Remove Gemini API key for current user
-    
-    Args:
-        request: HTTP request object
-        current_user: Current authenticated user
-        db: Database session
-        
-    Returns:
-        SuccessResponse: Removal confirmation
-    """
-    current_user.gemini_api_key = None
-    db.commit()
-    
-    # Log the action
-    log_user_action(
-        db=db,
-        user_id=current_user.id,
-        action="remove_gemini_api_key",
-        resource_type="user",
-        resource_id=str(current_user.id),
-        request=request
-    )
-    
-    return SuccessResponse(message="Gemini API key removed successfully")
 
 @app.post("/admin/upload_urls", response_model=SuccessResponse)
 async def admin_upload_urls(

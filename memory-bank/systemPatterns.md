@@ -2,26 +2,37 @@
 
 ## 1. System Architecture
 
-The system follows a classic client-server architecture:
+The system follows a modern containerized client-server architecture with enterprise-grade security, enhanced analytics, and production-ready deployment:
 
-*   **Frontend (Client):** A Next.js single-page application (SPA) running in the user's browser. It interacts with the backend via HTTP API calls.
-*   **Backend (Server):** A FastAPI (Python) application providing a RESTful API. It handles business logic, database interactions, and serves some basic HTML templates if needed (though primarily an API).
-*   **Database:** An SQLite database stores application data (URLs, tasks, labels, users).
-*   **Containerization:** Both frontend and backend applications are containerized using Docker and orchestrated with Docker Compose for local development and deployment.
+*   **Frontend (Client):** A production-ready Next.js single-page application (SPA) running in the user's browser. It interacts with the backend via HTTP API calls, includes comprehensive admin tools with real-time analytics, AND manages API keys securely in browser-only storage.
+*   **Backend (Server):** A FastAPI (Python) application providing a RESTful API with enhanced analytics endpoints and zero API key storage for enhanced security. It handles business logic, database interactions, performance tracking, and data export capabilities.
+*   **Database:** An SQLite database stores application data (URLs, tasks, labels, users) with proper persistence across container restarts. API keys are intentionally NOT stored for security.
+*   **Containerization:** Both frontend and backend applications are containerized using production-grade Docker builds and orchestrated with Docker Compose for reliable deployment.
+*   **Security Model:** API keys maintained exclusively in frontend localStorage, passed with requests but never persisted server-side.
 
 ```mermaid
 graph TD
     User[User Browser] -->|HTTPS| FE[Frontend: Next.js on Node.js]
-    FE -->|HTTP API Calls| BE[Backend: FastAPI on Python]
+    FE -->|HTTP API Calls + API Key| BE[Backend: FastAPI on Python]
     BE --> DB[Database: SQLite]
-
+    BE --> Analytics[Analytics Engine]
+    Analytics --> Export[CSV Export]
+    
+    FE --> LocalStorage[Browser localStorage<br/>🔒 API Keys Only]
+    
     subgraph Docker Environment
         direction LR
         subgraph Frontend Container
             FE
+            UI[Modern UI Components]
+            Dashboard[Admin Dashboard]
+            APIContext[API Key Context]
         end
         subgraph Backend Container
             BE
+            API[Core API Endpoints]
+            Analytics
+            AI[Gemini AI Service<br/>🔒 No Key Storage]
         end
         DB -- Volume Mount --> HostFS[(Host File System)]
     end
@@ -29,46 +40,78 @@ graph TD
 
 ## 2. Key Technical Decisions
 
-*   **FastAPI (Backend):** Chosen for its high performance, ease of use, automatic data validation (Pydantic), and built-in OpenAPI/Swagger documentation.
-*   **Next.js (Frontend):** Chosen for its powerful features for building modern React applications, including server-side rendering (SSR) / static site generation (SSG) capabilities (though primarily used for client-side rendering in this PoC), routing, and a good developer experience.
-*   **Tailwind CSS (Frontend):** Chosen for its utility-first approach, enabling rapid UI development and easy customization without writing extensive custom CSS.
-*   **SQLite (Database):** Chosen for its simplicity, file-based nature, and ease of setup for a PoC. No external database server is required.
-*   **Docker & Docker Compose:** Chosen for consistent development and deployment environments, simplifying setup and dependency management across different machines.
-*   **Python for Backend:** A widely used language with a rich ecosystem of libraries, suitable for web development and data handling.
-*   **TypeScript for Frontend:** Adds static typing to JavaScript, improving code quality, maintainability, and developer productivity.
+*   **FastAPI (Backend):** Chosen for its high performance, ease of use, automatic data validation (Pydantic), and built-in OpenAPI/Swagger documentation. Enhanced with analytics endpoints for performance tracking AND zero API key storage for security.
+*   **Next.js (Frontend):** Chosen for its powerful features for building modern React applications, with production-ready build optimizations, component-based architecture, AND secure client-side state management.
+*   **Frontend-Only API Key Storage:** Critical security decision to move API key storage from backend database to browser localStorage only, ensuring server never persists sensitive credentials.
+*   **Tailwind CSS (Frontend):** Chosen for its utility-first approach, enabling rapid UI development and easy customization. Used to create modern, responsive interfaces.
+*   **SQLite (Database):** Chosen for its simplicity and file-based nature for PoC. Enhanced with proper volume mounting for persistence AND API key column removal for security.
+*   **Docker & Docker Compose:** Enhanced with production-grade multi-stage builds, security hardening, and optimized image sizes for reliable deployment.
+*   **Analytics Architecture:** Separated analytics logic into dedicated endpoints to maintain clean separation of concerns and enable advanced performance tracking.
 
 ## 3. Design Patterns in Use
 
-*   **RESTful API Design:** The backend API aims to follow REST principles for resource management.
-*   **Repository Pattern (Conceptual):** While not strictly implemented with interfaces for a PoC, the database interaction logic in the backend will be separated into specific modules/functions, acting like repositories for data access.
-*   **Component-Based Architecture (Frontend):** The Next.js frontend is built using reusable React components.
-*   **Client-Side State Management (Frontend):** React's `useState` and `useEffect` hooks are used for managing component-level state. Global state management (like Redux or Zustand) is not planned for the PoC unless a clear need arises.
-*   **Multi-Stage Docker Builds:** Used to create optimized and smaller production Docker images, especially for the frontend (separating build environment from runtime environment).
+*   **RESTful API Design:** The backend API follows REST principles with enhanced analytics endpoints (`/analytics/*`) and secure API key handling.
+*   **Repository Pattern (Conceptual):** Database interaction logic is separated into specific modules with optimized queries for analytics and security compliance.
+*   **Component-Based Architecture (Frontend):** The Next.js frontend is built using reusable React components with modern patterns like collapsible sections and tag-based interfaces.
+*   **Security-First Context Pattern:** React Context (`ApiKeyContext`) manages sensitive API keys in frontend-only scope with secure localStorage integration.
+*   **Request-Scoped Security:** API keys passed with individual requests but never persisted server-side, maintaining zero-trust security model.
+*   **Analytics Service Pattern:** Dedicated analytics service layer for performance tracking, metrics calculation, and data export functionality.
+*   **Multi-Stage Docker Builds:** Production-ready builds with optimized and secure Docker images, especially for the frontend with proper dependency management.
+*   **Configuration Management Pattern:** Global YAML configuration file shared between backend and frontend for consistent settings.
 
 ## 4. Component Relationships
 
-*   **Frontend Components:** 
-    *   `Layout` wraps all pages, providing consistent structure (Navbar, main content area).
-    *   `Navbar` provides navigation links.
-    *   Admin pages/components (`UrlUploadForm`, `AdminUploadPage`, `ApiKeyManager`, `ContentAnalyzer`) handle URL submission and AI key management.
-    *   Labeler pages/components (`TaskView`, `LabelingForm`, `LabelerTaskPage`) handle task display, website iframe, and label submission.
-*   **Backend Modules (Located in `backend/src/`):
-    *   `main.py`: FastAPI app initialization, API endpoint definitions, Jinja2 template configuration.
-    *   `models.py`: SQLAlchemy database models (User, Website, Label, Tag).
-    *   `schemas.py`: Pydantic schemas for request/response validation and serialization.
-    *   `database.py`: Database engine setup, `SessionLocal`, `Base` for models, `get_db` dependency, `create_db_and_tables` utility.
-    *   `ai_service.py`: Google Gemini AI integration for content analysis, web scraping, and AI-powered content detection.
-    *   `config.py`: Global configuration loading and management utilities.
-    *   (No explicit `routers/` or `crud.py` modules yet; logic is currently within `main.py` for PoC).
-*   **Scripts (Located in `scripts/` at project root):
-    *   `init_db.py`: Script to initialize the database schema and add default users. Interacts with modules in `backend/src/`.
+*   **Enhanced Frontend Components:** 
+    *   `Layout` wraps all pages with consistent navigation and authentication
+    *   `ApiKeyProvider` wraps application with secure API key context management
+    *   `ApiKeyManager` handles frontend-only API key storage and validation
+    *   `Navbar` provides role-based navigation with admin tools
+    *   Admin components (`AdminDashboard`, `UrlUploadForm`, `AnalyticsView`) handle comprehensive admin functionality
+    *   Labeler components (`TaskView`, `LabelingForm`) with modern indicator interface using tag-based selection AND secure API key integration
+    *   Analytics components (`PerformanceTable`, `ExportInterface`) for performance tracking and data export
+*   **Enhanced Backend Modules (Located in `backend/src/`):**
+    *   `main.py`: FastAPI app with core endpoints plus enhanced analytics endpoints AND secure API key handling
+    *   `models.py`: SQLAlchemy database models with proper relationships (API key fields removed for security)
+    *   `schemas.py`: Pydantic schemas including analytics response models AND API key request schemas
+    *   `database.py`: Database engine with optimized connection handling
+    *   `ai_service.py`: Google Gemini AI integration for content analysis with request-scoped API keys
+    *   `config.py`: Global configuration management utilities
+    *   **Analytics Module**: Performance tracking, metrics calculation, and export functionality
+    *   **Security Module**: Zero-persistence API key handling and secure request processing
+*   **Production Docker Configuration:**
+    *   Multi-stage frontend Dockerfile with security hardening and optimization
+    *   Backend Docker configuration with proper Python path and Poetry integration
+    *   docker-compose.yml with proper service communication and volume management
 
 ## 5. Critical Implementation Paths
 
-1.  **Database Persistence (Current Critical Issue):** Ensuring SQLite database file persists between container restarts is essential for system reliability. The current volume mount configuration needs investigation.
-2.  **AI Integration Workflow:** The complete path from API key management → content analysis request → Gemini AI processing → result storage is critical for the core value proposition.
-3.  **Labeling Workflow End-to-End:** This is the core functionality. Ensuring smooth data flow from URL upload (admin) → task assignment (labeler) → label submission (labeler) → database storage is critical.
-4.  **Database Schema and Initialization:** A correct and robust database schema is essential for storing data accurately. The `init_db.py` script is critical for setting up the application for the first time.
-5.  **API Endpoint Integrity:** Ensuring all API endpoints behave as expected, with correct request handling, validation, and response generation.
-6.  **Frontend-Backend Integration:** Correctly calling backend APIs from the frontend and handling responses (including errors).
-7.  **Docker Configuration:** Ensuring `Dockerfile`s and `docker-compose.yml` are correctly configured for both development and (eventual) production builds. 
+1.  **Secure Analytics Workflow:** URL upload → task assignment → labeling completion (with secure API key) → performance tracking → analytics dashboard → data export is the complete analytics pipeline.
+2.  **Security-First API Path:** Frontend API key storage → request composition → backend processing → immediate disposal (zero persistence).
+3.  **Production Docker Pipeline:** Code → multi-stage build → optimized container → service orchestration → network communication → persistent storage.
+4.  **User Experience Flow:** Login → role-based interface → API key setup → task management → modern indicator selection → submission → real-time feedback.
+5.  **Admin Management Flow:** Dashboard → analytics view → URL management → performance tracking → data export → system monitoring.
+6.  **Database Persistence Path:** Ensuring SQLite database file persists between container restarts with proper volume mounting configuration.
+7.  **API Integration Path:** Frontend → authentication + API key → backend APIs → analytics processing → data visualization → user feedback.
+
+## 6. Security Architecture
+
+*   **Zero Backend Storage:** API keys never stored in database, configuration files, or server memory beyond request scope.
+*   **Frontend-Only Persistence:** API keys stored securely in browser localStorage with proper cleanup and validation.
+*   **Request-Scoped Processing:** API keys passed with individual AI analysis requests but immediately discarded after use.
+*   **Migration Compliance:** Database migration script safely removes existing API key storage with verification and rollback capabilities.
+*   **User Control:** Users maintain complete ownership and control over their API credentials with no server dependency.
+
+## 7. Analytics Architecture
+
+*   **Performance Tracking:** Real-time calculation of labeling velocity, accuracy trends, and individual performance metrics.
+*   **Data Aggregation:** SQL-based analytics with proper aggregation queries for system-wide and individual statistics.
+*   **Export Functionality:** CSV export with configurable date ranges and comprehensive labeling data.
+*   **Real-time Dashboard:** Live updating admin dashboard with key performance indicators and system health metrics.
+
+## 8. Production Readiness Patterns
+
+*   **Security Hardening:** Non-root Docker users, optimized image sizes, proper secret management, AND zero API key persistence.
+*   **Scalability Considerations:** Component-based architecture ready for horizontal scaling, database ready for migration to PostgreSQL.
+*   **Monitoring Ready:** Structured logging, error handling, and performance metrics collection in place.
+*   **Deployment Ready:** Production Docker builds, environment variable management, and service orchestration configured.
+*   **Enterprise Security:** Frontend-only API key management meets enterprise privacy and security requirements. 

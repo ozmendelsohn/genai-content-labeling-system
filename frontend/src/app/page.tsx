@@ -25,7 +25,6 @@ import {
 } from '@heroicons/react/24/outline';
 
 function DashboardContent() {
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
 
@@ -179,7 +178,7 @@ function DashboardContent() {
                     AI Configuration
                   </h2>
                 </div>
-                <ApiKeyManager onApiKeyChange={setHasApiKey} />
+                <ApiKeyManager />
               </div>
             </Card>
 
@@ -218,7 +217,7 @@ function DashboardContent() {
 
           {/* Content Analyzer */}
           <div className="lg:col-span-2">
-            <ContentAnalyzer hasApiKey={hasApiKey} />
+            <ContentAnalyzer />
           </div>
         </div>
 

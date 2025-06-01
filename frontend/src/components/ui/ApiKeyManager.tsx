@@ -1,24 +1,18 @@
 /**
  * API Key Manager Component
  * 
- * A component for managing Google Gemini AI API keys with validation
- * and status display for the GenAI Content Labeling System.
+ * A component for managing Google Gemini AI API keys with frontend-only storage
+ * for enhanced security. API keys are never sent to the backend for storage.
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState } from 'react';
+import { useApiKey } from '@/contexts/ApiKeyContext';
 import { cn } from '@/lib/design-system';
 import Input from './Input';
 import Button from './Button';
 import { KeyIcon, CheckCircleIcon, XCircleIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-
-interface ApiKeyStatus {
-  valid: boolean;
-  message: string;
-  has_api_key: boolean;
-}
 
 interface ApiKeyManagerProps {
   className?: string;
@@ -29,141 +23,62 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
   className,
   onApiKeyChange 
 }) => {
-  const [apiKey, setApiKey] = useState('');
+  const [inputApiKey, setInputApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [status, setStatus] = useState<ApiKeyStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const { token } = useAuth();
+  const [validating, setValidating] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  const { apiKey, hasApiKey, setApiKey, validateApiKey, clearApiKey } = useApiKey();
 
-  // Check initial API key status only when authenticated
-  useEffect(() => {
-    if (token) {
-      checkApiKeyStatus();
-    }
-  }, [token]);
-
-  const checkApiKeyStatus = async () => {
-    try {
-      setChecking(true);
-      if (!token) {
-        setChecking(false);
-        return;
-      }
-
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE_URL}/ai/api-key/status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data: ApiKeyStatus = await response.json();
-        setStatus(data);
-        onApiKeyChange?.(data.has_api_key);
-      }
-    } catch (error) {
-      console.error('Failed to check API key status:', error);
-    } finally {
-      setChecking(false);
-    }
-  };
+  React.useEffect(() => {
+    onApiKeyChange?.(hasApiKey);
+  }, [hasApiKey, onApiKeyChange]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiKey.trim()) return;
+    if (!inputApiKey.trim()) return;
 
     try {
-      setLoading(true);
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      setValidating(true);
+      setValidationMessage(null);
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE_URL}/ai/api-key`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ api_key: apiKey }),
-      });
-
-      const data: ApiKeyStatus = await response.json();
-      setStatus(data);
+      const validation = await validateApiKey(inputApiKey.trim());
       
-      if (data.valid) {
-        setApiKey('');
-        onApiKeyChange?.(true);
-      }
-    } catch (error) {
-      console.error('Failed to set API key:', error);
-      setStatus({
-        valid: false,
-        message: 'Failed to validate API key. Please try again.',
-        has_api_key: false
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRemoveApiKey = async () => {
-    try {
-      setLoading(true);
-      if (!token) return;
-
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE_URL}/ai/api-key`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        setStatus({
-          valid: false,
-          message: 'API key removed successfully',
-          has_api_key: false
+      if (validation.valid) {
+        setApiKey(inputApiKey.trim());
+        setInputApiKey('');
+        setValidationMessage({
+          type: 'success',
+          message: 'API key saved successfully! It will be validated when used for analysis.'
         });
-        onApiKeyChange?.(false);
+      } else {
+        setValidationMessage({
+          type: 'error',
+          message: validation.message
+        });
       }
     } catch (error) {
-      console.error('Failed to remove API key:', error);
+      setValidationMessage({
+        type: 'error',
+        message: 'Failed to validate API key. Please try again.'
+      });
     } finally {
-      setLoading(false);
+      setValidating(false);
     }
   };
 
-  // Show login required message if not authenticated
-  if (!token) {
-    return (
-      <div className={cn("space-y-4", className)}>
-        <div className="flex items-center space-x-2">
-          <KeyIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white">
-            Gemini AI API Key
-          </h3>
-        </div>
-        <div className="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            Please log in to configure your Gemini AI API key.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handleRemoveApiKey = () => {
+    clearApiKey();
+    setValidationMessage({
+      type: 'success',
+      message: 'API key removed successfully.'
+    });
+  };
 
-  if (checking) {
-    return (
-      <div className={cn("animate-pulse", className)}>
-        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-2"></div>
-        <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded"></div>
-      </div>
-    );
-  }
+  const maskApiKey = (key: string) => {
+    if (key.length <= 8) return key;
+    return key.substring(0, 4) + '••••••••' + key.substring(key.length - 4);
+  };
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -172,41 +87,49 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
         <h3 className="text-lg font-medium text-slate-900 dark:text-white">
           Gemini AI API Key
         </h3>
-        {status && (
-          <div className="flex items-center space-x-1">
-            {status.has_api_key ? (
-              <CheckCircleIcon className="w-5 h-5 text-green-500" />
-            ) : (
-              <XCircleIcon className="w-5 h-5 text-red-500" />
-            )}
-          </div>
+        {hasApiKey && (
+          <CheckCircleIcon className="w-5 h-5 text-green-500" />
         )}
       </div>
 
-      {status && (
+      {validationMessage && (
         <div className={cn(
           "p-3 rounded-lg border",
-          status.valid || status.has_api_key
+          validationMessage.type === 'success'
             ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
-            : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200"
+            : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200"
         )}>
-          <p className="text-sm font-medium">{status.message}</p>
+          <p className="text-sm font-medium">{validationMessage.message}</p>
         </div>
       )}
 
-      {status?.has_api_key ? (
+      {hasApiKey ? (
         <div className="space-y-3">
+          <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  API Key Configured
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-300 font-mono">
+                  {maskApiKey(apiKey || '')}
+                </p>
+              </div>
+              <CheckCircleIcon className="w-5 h-5 text-green-500" />
+            </div>
+          </div>
+          
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Your Gemini AI API key is configured and ready for content analysis.
+            Your Gemini AI API key is stored securely in your browser and ready for content analysis.
           </p>
+          
           <Button
             variant="outline"
             size="sm"
             onClick={handleRemoveApiKey}
-            disabled={loading}
             className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
           >
-            {loading ? 'Removing...' : 'Remove API Key'}
+            Remove API Key
           </Button>
         </div>
       ) : (
@@ -218,11 +141,11 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
             <div className="relative">
               <Input
                 type={showApiKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                value={inputApiKey}
+                onChange={(e) => setInputApiKey(e.target.value)}
                 placeholder="Enter your Gemini API key..."
                 className="pr-10"
-                disabled={loading}
+                disabled={validating}
               />
               <button
                 type="button"
@@ -251,19 +174,31 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
 
           <Button
             type="submit"
-            disabled={!apiKey.trim() || loading}
+            disabled={!inputApiKey.trim() || validating}
             className="w-full"
           >
-            {loading ? 'Validating...' : 'Set API Key'}
+            {validating ? 'Validating...' : 'Save API Key'}
           </Button>
         </form>
       )}
 
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
         <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">
+          🔒 Enhanced Security
+        </h4>
+        <div className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
+          <p>• Your API key is stored only in your browser (localStorage)</p>
+          <p>• It's never sent to our servers for storage</p>
+          <p>• Only transmitted when making AI analysis requests</p>
+          <p>• You'll need to re-enter it if you clear browser data</p>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
           What is this for?
         </h4>
-        <p className="text-xs text-blue-800 dark:text-blue-300">
+        <p className="text-xs text-gray-800 dark:text-gray-300">
           The Gemini AI API key enables automatic content analysis to pre-classify whether 
           web content is AI-generated or human-created, making your labeling work more efficient.
         </p>

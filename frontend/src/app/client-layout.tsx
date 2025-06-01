@@ -1,7 +1,7 @@
 /**
  * Client Layout Component
  * 
- * Client-side layout wrapper that provides authentication context
+ * Client-side layout wrapper that provides authentication context and API key context
  * and handles navigation based on authentication state.
  */
 
@@ -9,6 +9,7 @@
 
 import React, { ReactNode } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ApiKeyProvider } from '@/contexts/ApiKeyContext';
 import AuthenticatedLayout from './authenticated-layout';
 
 interface ClientLayoutProps {
@@ -18,9 +19,11 @@ interface ClientLayoutProps {
 export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <AuthProvider>
-      <AuthenticatedLayout>
-        {children}
-      </AuthenticatedLayout>
+      <ApiKeyProvider>
+        <AuthenticatedLayout>
+          {children}
+        </AuthenticatedLayout>
+      </ApiKeyProvider>
     </AuthProvider>
   );
 } 
