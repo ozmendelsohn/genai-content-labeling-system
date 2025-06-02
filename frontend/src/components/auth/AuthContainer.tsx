@@ -50,7 +50,15 @@ export default function AuthContainer({ onLoginSuccess, initialMode = 'login' }:
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 text-center">
             <div className="mb-4">
               <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg 
+                  className="w-8 h-8 text-green-600 dark:text-green-400" 
+                  width="32" 
+                  height="32" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  style={{ width: '32px', height: '32px' }}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -83,7 +91,15 @@ export default function AuthContainer({ onLoginSuccess, initialMode = 'login' }:
             <div className="text-center mb-8">
               <div className="flex items-center justify-center mb-4">
                 <div className="p-3 bg-blue-600 rounded-full">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg 
+                    className="w-8 h-8 text-white" 
+                    width="32" 
+                    height="32" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    style={{ width: '32px', height: '32px' }}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                   </svg>
                 </div>

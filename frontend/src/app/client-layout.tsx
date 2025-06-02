@@ -1,8 +1,8 @@
 /**
  * Client Layout Component
  * 
- * Client-side layout wrapper that provides authentication context and API key context
- * and handles navigation based on authentication state.
+ * Client-side layout wrapper that provides authentication context, API key context,
+ * and theme context using next-themes for reliable theme switching.
  */
 
 'use client';
@@ -21,7 +21,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <AuthProvider>
       <ApiKeyProvider>
-        <ThemeProvider defaultTheme="system" storageKey="ui-theme">
+        <ThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          storageKey="ui-theme"
+          enableSystem={true}
+          disableTransitionOnChange={false}
+        >
           <AuthenticatedLayout>
             {children}
           </AuthenticatedLayout>

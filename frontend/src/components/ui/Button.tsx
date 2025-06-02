@@ -1,5 +1,5 @@
 /**
- * Modern Button Component
+ * Modern Button Component following shadcn/ui patterns
  * 
  * A flexible button component with multiple variants, sizes, and states.
  * Supports loading states, icons, and accessibility features.
@@ -9,19 +9,19 @@ import React from 'react';
 import { cn } from '@/lib/design-system';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({
-    variant = 'primary',
-    size = 'md',
+    variant = 'default',
+    size = 'default',
     isLoading = false,
     leftIcon,
     rightIcon,
@@ -31,30 +31,29 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     children,
     ...props
   }, ref) => {
-    const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 disabled:opacity-50 disabled:cursor-not-allowed';
+    const baseClasses = 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
     
     const variantClasses = {
-      primary: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-white shadow-sm hover:shadow-md',
-      secondary: 'bg-slate-600 hover:bg-slate-700 focus:ring-slate-500 text-white shadow-sm hover:shadow-md',
-      success: 'bg-green-600 hover:bg-green-700 focus:ring-green-500 text-white shadow-sm hover:shadow-md',
-      warning: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500 text-white shadow-sm hover:shadow-md',
-      error: 'bg-red-600 hover:bg-red-700 focus:ring-red-500 text-white shadow-sm hover:shadow-md',
-      outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-500 bg-transparent',
-      ghost: 'text-blue-600 hover:bg-blue-50 focus:ring-blue-500 bg-transparent',
+      default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      link: 'text-primary underline-offset-4 hover:underline',
     };
     
     const sizeClasses = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
-      xl: 'px-8 py-4 text-lg',
+      default: 'h-10 px-4 py-2',
+      sm: 'h-9 rounded-md px-3',
+      lg: 'h-11 rounded-md px-8',
+      icon: 'h-10 w-10',
     };
     
     const iconSizeClasses = {
+      default: 'w-4 h-4',
       sm: 'w-4 h-4',
-      md: 'w-4 h-4',
       lg: 'w-5 h-5',
-      xl: 'w-6 h-6',
+      icon: 'w-4 h-4',
     };
     
     const LoadingSpinner = ({ size }: { size: keyof typeof iconSizeClasses }) => (
@@ -96,7 +95,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {isLoading ? (
           <>
             <LoadingSpinner size={size} />
-            <span className="ml-2">Loading...</span>
+            {children && <span className="ml-2">Loading...</span>}
           </>
         ) : (
           <>

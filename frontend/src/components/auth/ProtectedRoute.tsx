@@ -9,7 +9,7 @@
 
 import React, { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import LoginForm from './LoginForm';
+import AuthContainer from './AuthContainer';
 import { User } from '@/lib/auth';
 
 interface ProtectedRouteProps {
@@ -60,7 +60,7 @@ export default function ProtectedRoute({
   fallback, 
   redirectTo 
 }: ProtectedRouteProps) {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, login } = useAuth();
 
   // Show loading while checking authentication
   if (isLoading) {
@@ -69,7 +69,7 @@ export default function ProtectedRoute({
 
   // Show login form if not authenticated
   if (!isAuthenticated || !user) {
-    return <LoginForm redirectTo={redirectTo} />;
+    return <AuthContainer onLoginSuccess={(token, userData) => login(token, userData)} />;
   }
 
   // Check role-based access if required

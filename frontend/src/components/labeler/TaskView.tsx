@@ -192,7 +192,7 @@ export default function TaskView() {
             <iframe
               src={task.url}
               title="Website Content"
-              className="w-full h-full border border-gray-700 rounded-md bg-white"
+              className="w-full h-full border border-gray-700 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800"
               onError={() => {
                 setError("Failed to load website content. The URL might not support embedding.");
               }}
