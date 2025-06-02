@@ -6,8 +6,8 @@ import ClientLayout from "./client-layout";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GenAI Content Labeling",
-  description: "Assists in labeling web content as AI-generated or human-generated.",
+  title: "GenAI Content Detection Assistant",
+  description: "Intelligent content labeling system powered by AI",
 };
 
 export default function RootLayout({
@@ -16,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#ffffff" />
+      </head>
+      <body className={`${inter.className} bg-white dark:bg-black text-black dark:text-white antialiased min-h-screen transition-all duration-300`}>
         <ClientLayout>
           {children}
         </ClientLayout>

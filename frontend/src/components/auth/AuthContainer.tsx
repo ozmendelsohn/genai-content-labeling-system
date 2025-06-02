@@ -45,9 +45,10 @@ export default function AuthContainer({ onLoginSuccess, initialMode = 'login' }:
   // Show success message after signup
   if (showSuccessMessage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-slate-100 dark:from-black dark:via-gray-900 dark:to-gray-800 opacity-90"></div>
+        <div className="relative z-10 max-w-md w-full">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center">
             <div className="mb-4">
               <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
                 <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,9 +77,10 @@ export default function AuthContainer({ onLoginSuccess, initialMode = 'login' }:
   // Show login form
   if (mode === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-slate-100 dark:from-black dark:via-gray-900 dark:to-gray-800 opacity-90"></div>
+        <div className="relative z-10 w-full max-w-md">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl border-2 border-gray-200 dark:border-gray-700 p-8">
             {/* Header */}
             <div className="text-center mb-8">
               <div className="flex items-center justify-center mb-4">

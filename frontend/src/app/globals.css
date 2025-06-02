@@ -1,26 +1,176 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* GitHub-inspired Professional Theme Colors */
+
+/* LIGHT MODE - GitHub Light Theme */
+html:not(.dark) {
+  background: #f6f8fa !important;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html:not(.dark) body {
+  background: #f6f8fa !important;
+  color: #24292f !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html:not(.dark) * {
+  color: #24292f !important;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* DARK MODE - GitHub Dark Theme */
+html.dark {
+  background: #0d1117 !important;
+}
+
+html.dark body {
+  background: #0d1117 !important;
+  color: #f0f6fc !important;
+}
+
+html.dark * {
+  color: #f0f6fc !important;
+}
+
+/* Fix main page backgrounds - target specific patterns */
+html:not(.dark) .min-h-screen {
+  background: #f6f8fa !important;
+}
+
+html.dark .min-h-screen {
+  background: #0d1117 !important;
+}
+
+/* Override gradient overlays */
+html:not(.dark) .absolute.inset-0 {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+html.dark .absolute.inset-0 {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* Target gradient classes specifically */
+html:not(.dark) [class*="bg-gradient-to"] {
+  background: #f6f8fa !important;
+  background-image: none !important;
+}
+
+html.dark [class*="bg-gradient-to"] {
+  background: #0d1117 !important;
+  background-image: none !important;
+}
+
+/* Card backgrounds */
+html:not(.dark) [class*="Card"],
+html:not(.dark) .card {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  color: #24292f !important;
+}
+
+html.dark [class*="Card"],
+html.dark .card {
+  background-color: #161b22 !important;
+  border: 1px solid #30363d !important;
+  color: #f0f6fc !important;
+}
+
+/* Navigation */
+html:not(.dark) nav {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #d0d7de !important;
+  color: #24292f !important;
+}
+
+html.dark nav {
+  background-color: #161b22 !important;
+  border-bottom: 1px solid #30363d !important;
+  color: #f0f6fc !important;
+}
+
+/* Buttons */
+html:not(.dark) button {
+  background-color: #f6f8fa !important;
+  color: #24292f !important;
+  border: 1px solid #d0d7de !important;
+}
+
+html:not(.dark) button:hover {
+  background-color: #f3f4f6 !important;
+}
+
+html.dark button {
+  background-color: #21262d !important;
+  color: #f0f6fc !important;
+  border: 1px solid #30363d !important;
+}
+
+html.dark button:hover {
+  background-color: #30363d !important;
+}
+
+/* Primary buttons (blue) */
+html:not(.dark) .bg-blue-600,
+html:not(.dark) [class*="bg-blue"] {
+  background-color: #0969da !important;
+  color: #ffffff !important;
+  border: 1px solid #0969da !important;
+}
+
+html.dark .bg-blue-600,
+html.dark [class*="bg-blue"] {
+  background-color: #1f6feb !important;
+  color: #ffffff !important;
+  border: 1px solid #1f6feb !important;
+}
+
+/* Text colors */
+html:not(.dark) h1, html:not(.dark) h2, html:not(.dark) h3,
+html:not(.dark) .font-bold, html:not(.dark) .font-semibold {
+  color: #24292f !important;
+}
+
+html.dark h1, html.dark h2, html.dark h3,
+html.dark .font-bold, html.dark .font-semibold {
+  color: #f0f6fc !important;
+}
+
+/* Muted text */
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-gray-600,
+html:not(.dark) [class*="text-slate"] {
+  color: #656d76 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-gray-600,
+html.dark [class*="text-slate"] {
+  color: #8b949e !important;
+}
+
+/* Fix colored backgrounds that should maintain their color */
+html:not(.dark) .bg-purple-100,
+html:not(.dark) .bg-purple-900 {
+  background-color: #f3e8ff !important;
+}
+
+html.dark .bg-purple-100,
+html.dark .bg-purple-900 {
+  background-color: #581c87 !important;
+}
+
+html:not(.dark) .bg-green-100,
+html:not(.dark) .bg-green-900 {
+  background-color: #dcfce7 !important;
+}
+
+html.dark .bg-green-100,
+html.dark .bg-green-900 {
+  background-color: #14532d !important;
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease !important;
 }

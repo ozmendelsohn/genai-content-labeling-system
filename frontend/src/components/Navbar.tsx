@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/design-system';
 import { useAuth } from '@/contexts/AuthContext';
 import Badge from '@/components/ui/Badge';
+import ThemeToggle from './ui/ThemeToggle';
 
 // Icons
 const MenuIcon = () => (
@@ -166,7 +167,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-black backdrop-blur-md border-b-2 border-gray-200 dark:border-gray-800 sticky top-0 z-50 shadow-lg dark:shadow-black/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -185,7 +186,16 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
+          <div className="hidden md:flex items-center space-x-4">
+            {/* Theme Toggle */}
+            <ThemeToggle size="md" />
+            
+            {/* Status Indicator */}
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-slate-600 dark:text-slate-400">Online</span>
+            </div>
+
             {navigation.map((item) => (
               <NavLink
                 key={item.name}
@@ -201,12 +211,6 @@ export default function Navbar() {
 
           {/* User Menu */}
           <div className="hidden md:flex items-center space-x-4">
-            {/* Status Indicator */}
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400">Online</span>
-            </div>
-
             {/* User Dropdown */}
             <div className="relative">
               <button
@@ -261,18 +265,27 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
           <div className="px-4 py-4 space-y-2">
-            {navigation.map((item) => (
-              <NavLink
-                key={item.name}
-                href={item.href}
-                icon={item.icon}
-                badge={item.badge}
-                isActive={pathname === item.href}
-                onClick={closeMobileMenu}
-              >
-                {item.name}
-              </NavLink>
-            ))}
+            {/* Mobile menu items */}
+            <div className="space-y-1 px-4 pt-2 pb-3">
+              {/* Theme Toggle for Mobile */}
+              <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700 mb-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Theme</span>
+                <ThemeToggle size="md" showLabel={false} />
+              </div>
+              
+              {navigation.map((item) => (
+                <NavLink
+                  key={item.name}
+                  href={item.href}
+                  icon={item.icon}
+                  badge={item.badge}
+                  isActive={pathname === item.href}
+                  onClick={closeMobileMenu}
+                >
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
             
             {/* Mobile User Info & Logout */}
             <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">

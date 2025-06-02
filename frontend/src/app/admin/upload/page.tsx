@@ -127,8 +127,9 @@ function AdminUploadContent() {
   const urlCount = urls.split('\n').filter(url => url.trim()).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white dark:bg-black py-8">
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-slate-100 dark:from-black dark:via-gray-900 dark:to-gray-800 opacity-90"></div>
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center mb-4">

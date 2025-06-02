@@ -138,8 +138,9 @@ export default function SignupForm({ onSignupSuccess, onSwitchToLogin }: SignupF
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-slate-100 dark:from-black dark:via-gray-900 dark:to-gray-800 opacity-90"></div>
+      <Card className="relative z-10 w-full max-w-md shadow-2xl border-2 border-gray-200 dark:border-gray-700">
         <div className="p-8">
           {/* Header */}
           <div className="text-center mb-8">
