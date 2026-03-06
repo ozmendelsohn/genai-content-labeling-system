@@ -617,6 +617,11 @@ async def bulk_upload_content(
 async def list_content_items(
     pagination: PaginationParams = Depends(),
     filters: FilterParams = Depends(),
+    assigned_user: Optional[str] = None,
+    domain: Optional[str] = None,
+    priority: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: User = Depends(require_viewer),
     db: Session = Depends(get_db)
 ):
@@ -626,12 +631,20 @@ async def list_content_items(
     Args:
         pagination: Pagination parameters
         filters: Filter parameters
+        assigned_user: Filter by assigned user ID or 'unassigned'
+        domain: Filter by domain
+        priority: Filter by priority level (1-5)
+        date_from: Filter from date (YYYY-MM-DD)
+        date_to: Filter to date (YYYY-MM-DD)
         current_user: Current authenticated user
         db: Database session
         
     Returns:
         ContentItemListResponse: Paginated list of content items
     """
+    from urllib.parse import urlparse
+    from sqlalchemy import and_, or_
+    
     query = db.query(ContentItem)
     
     # Apply filters
@@ -646,6 +659,48 @@ async def list_content_items(
             (ContentItem.description.ilike(search_term))
         )
     
+    # Priority filter
+    if priority:
+        try:
+            priority_value = int(priority)
+            query = query.filter(ContentItem.priority == priority_value)
+        except ValueError:
+            pass
+    
+    # Assigned user filter
+    if assigned_user:
+        if assigned_user.lower() == 'unassigned':
+            query = query.filter(ContentItem.assigned_user_id.is_(None))
+        else:
+            try:
+                user_id = int(assigned_user)
+                query = query.filter(ContentItem.assigned_user_id == user_id)
+            except ValueError:
+                pass
+    
+    # Domain filter
+    if domain:
+        # Filter by domain using SQL LIKE with URL parsing logic
+        domain_pattern = f"%{domain}%"
+        query = query.filter(ContentItem.url.ilike(domain_pattern))
+    
+    # Date range filters
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+            query = query.filter(ContentItem.created_at >= from_date)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+            # Add one day to include the entire end date
+            end_date = datetime.combine(to_date, datetime.max.time())
+            query = query.filter(ContentItem.created_at <= end_date)
+        except ValueError:
+            pass
+    
     # For labelers, only show their assigned content
     if current_user.role == UserRole.LABELER:
         query = query.filter(ContentItem.assigned_user_id == current_user.id)
@@ -653,9 +708,9 @@ async def list_content_items(
     # Get total count
     total = query.count()
     
-    # Apply pagination
+    # Apply pagination and ordering
     offset = (pagination.page - 1) * pagination.per_page
-    content_items = query.offset(offset).limit(pagination.per_page).all()
+    content_items = query.order_by(ContentItem.created_at.desc()).offset(offset).limit(pagination.per_page).all()
     
     # Calculate pages
     pages = (total + pagination.per_page - 1) // pagination.per_page
@@ -672,38 +727,169 @@ async def list_content_items(
 @app.get("/dashboard", response_model=DashboardData)
 async def get_dashboard_data(
     current_user: User = Depends(get_current_active_user),
+    filters: FilterParams = Depends(),
+    assigned_user: Optional[str] = None,
+    domain: Optional[str] = None,
+    priority: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Get dashboard data for current user
+    Get dashboard data for current user with optional filtering
     
     Args:
         current_user: Current authenticated user
+        filters: Filter parameters
+        assigned_user: Filter by assigned user ID or 'unassigned'
+        domain: Filter by domain
+        priority: Filter by priority level (1-5)
+        date_from: Filter from date (YYYY-MM-DD)
+        date_to: Filter to date (YYYY-MM-DD)
         db: Database session
         
     Returns:
-        DashboardData: Dashboard statistics and data
+        DashboardData: Dashboard statistics and data (filtered if parameters provided)
     """
-    # User stats
+    from urllib.parse import urlparse
+    from sqlalchemy import and_, or_
+    
+    # User stats (always personal for the current user)
     user_labels = db.query(Label).filter(Label.labeler_id == current_user.id)
     total_labels = user_labels.count()
     
     today = datetime.utcnow().date()
     labels_today = user_labels.filter(Label.created_at >= today).count()
     
-    # System stats (for admins)
+    # System stats (for admins) - apply filters if provided
     if current_user.role == UserRole.ADMIN:
-        total_users = db.query(User).count()
-        active_users = db.query(User).filter(User.is_active == True).count()
-        total_content_items = db.query(ContentItem).count()
-        pending_content_items = db.query(ContentItem).filter(
+        # Build filtered query for content items
+        content_query = db.query(ContentItem)
+        
+        # Apply the same filters as in list_content_items
+        if filters.status:
+            content_query = content_query.filter(ContentItem.status == filters.status)
+        
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            content_query = content_query.filter(
+                (ContentItem.url.ilike(search_term)) |
+                (ContentItem.title.ilike(search_term)) |
+                (ContentItem.description.ilike(search_term))
+            )
+        
+        # Priority filter
+        if priority:
+            try:
+                priority_value = int(priority)
+                content_query = content_query.filter(ContentItem.priority == priority_value)
+            except ValueError:
+                pass
+        
+        # Assigned user filter
+        if assigned_user:
+            if assigned_user.lower() == 'unassigned':
+                content_query = content_query.filter(ContentItem.assigned_user_id.is_(None))
+            else:
+                try:
+                    user_id = int(assigned_user)
+                    content_query = content_query.filter(ContentItem.assigned_user_id == user_id)
+                except ValueError:
+                    pass
+        
+        # Domain filter
+        if domain:
+            domain_pattern = f"%{domain}%"
+            content_query = content_query.filter(ContentItem.url.ilike(domain_pattern))
+        
+        # Date range filters
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+                content_query = content_query.filter(ContentItem.created_at >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+                end_date = datetime.combine(to_date, datetime.max.time())
+                content_query = content_query.filter(ContentItem.created_at <= end_date)
+            except ValueError:
+                pass
+        
+        # Calculate filtered statistics
+        total_content_items = content_query.count()
+        pending_content_items = content_query.filter(
             ContentItem.status == ContentStatus.PENDING
         ).count()
-        completed_content_items = db.query(ContentItem).filter(
+        in_progress_content_items = content_query.filter(
+            ContentItem.status == ContentStatus.IN_PROGRESS
+        ).count()
+        completed_content_items = content_query.filter(
             ContentItem.status == ContentStatus.COMPLETED
         ).count()
-        total_system_labels = db.query(Label).count()
-        system_labels_today = db.query(Label).filter(Label.created_at >= today).count()
+        failed_content_items = content_query.filter(
+            ContentItem.status == ContentStatus.FAILED
+        ).count()
+        
+        # For labels, apply similar filtering by joining with content items
+        labels_query = db.query(Label).join(ContentItem, Label.content_item_id == ContentItem.id)
+        
+        # Apply same content filters to labels
+        if filters.status:
+            labels_query = labels_query.filter(ContentItem.status == filters.status)
+        
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            labels_query = labels_query.filter(
+                (ContentItem.url.ilike(search_term)) |
+                (ContentItem.title.ilike(search_term)) |
+                (ContentItem.description.ilike(search_term))
+            )
+        
+        if priority:
+            try:
+                priority_value = int(priority)
+                labels_query = labels_query.filter(ContentItem.priority == priority_value)
+            except ValueError:
+                pass
+        
+        if assigned_user:
+            if assigned_user.lower() == 'unassigned':
+                labels_query = labels_query.filter(ContentItem.assigned_user_id.is_(None))
+            else:
+                try:
+                    user_id = int(assigned_user)
+                    labels_query = labels_query.filter(ContentItem.assigned_user_id == user_id)
+                except ValueError:
+                    pass
+        
+        if domain:
+            domain_pattern = f"%{domain}%"
+            labels_query = labels_query.filter(ContentItem.url.ilike(domain_pattern))
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+                labels_query = labels_query.filter(ContentItem.created_at >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+                end_date = datetime.combine(to_date, datetime.max.time())
+                labels_query = labels_query.filter(ContentItem.created_at <= end_date)
+            except ValueError:
+                pass
+        
+        total_filtered_labels = labels_query.count()
+        filtered_labels_today = labels_query.filter(Label.created_at >= today).count()
+        
+        # Get active users count (unfiltered as it's a general system metric)
+        total_users = db.query(User).count()
+        active_users = db.query(User).filter(User.is_active == True).count()
         
         system_stats = SystemStats(
             total_users=total_users,
@@ -711,9 +897,10 @@ async def get_dashboard_data(
             total_content_items=total_content_items,
             pending_content_items=pending_content_items,
             completed_content_items=completed_content_items,
-            total_labels=total_system_labels,
-            labels_today=system_labels_today,
-            average_accuracy=89.3  # This would be calculated from actual data
+            total_labels=total_filtered_labels,
+            labels_today=filtered_labels_today,
+            average_accuracy=89.3,  # This would be calculated from actual data
+            failed_content_items=failed_content_items  # Added this field
         )
     else:
         system_stats = SystemStats(
@@ -1585,6 +1772,67 @@ async def submit_label(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to submit label: {str(e)}"
         )
+
+@app.get("/admin/available-labelers")
+async def get_available_labelers(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of all available labelers for filtering
+    
+    Args:
+        current_user: Current authenticated admin user
+        db: Database session
+        
+    Returns:
+        List: Available labelers with id, username, and full_name
+    """
+    labelers = db.query(User).filter(
+        User.role == UserRole.LABELER,
+        User.is_active == True
+    ).order_by(User.full_name).all()
+    
+    return [
+        {
+            "id": labeler.id,
+            "username": labeler.username,
+            "full_name": labeler.full_name or labeler.username
+        }
+        for labeler in labelers
+    ]
+
+@app.get("/admin/available-domains")
+async def get_available_domains(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of all unique domains from content items for filtering
+    
+    Args:
+        current_user: Current authenticated admin user
+        db: Database session
+        
+    Returns:
+        List[str]: Available domains
+    """
+    from urllib.parse import urlparse
+    
+    # Get all URLs from content items
+    urls = db.query(ContentItem.url).distinct().all()
+    
+    domains = set()
+    for url_tuple in urls:
+        try:
+            parsed_url = urlparse(url_tuple[0])
+            domain = parsed_url.netloc.lower()
+            if domain:
+                domains.add(domain)
+        except:
+            continue
+    
+    return sorted(list(domains))
 
 if __name__ == "__main__":
     import uvicorn

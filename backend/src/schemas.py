@@ -296,6 +296,7 @@ class SystemStats(BaseModel):
     total_content_items: int
     pending_content_items: int
     completed_content_items: int
+    failed_content_items: int = 0
     total_labels: int
     labels_today: int
     average_accuracy: float

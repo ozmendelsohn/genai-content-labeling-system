@@ -130,6 +130,7 @@ interface ContentFilters {
   search: string;
   priority: string;
   assigned_user: string;
+  domain: string;
   date_from: string;
   date_to: string;
 }
@@ -189,6 +190,10 @@ function AdminDashboardContent() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Filter options data
+  const [availableLabelers, setAvailableLabelers] = useState<Array<{id: number, username: string, full_name: string}>>([]);
+  const [availableDomains, setAvailableDomains] = useState<string[]>([]);
+  
   // Pagination and filtering
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -198,6 +203,7 @@ function AdminDashboardContent() {
     search: '',
     priority: '',
     assigned_user: '',
+    domain: '',
     date_from: '',
     date_to: ''
   });
@@ -210,6 +216,7 @@ function AdminDashboardContent() {
       loadDashboardData();
       loadContentItems();
       loadLabelingAnalytics();
+      loadFilterOptions();
     }
   }, [token, currentPage, filters]);
 
@@ -217,8 +224,22 @@ function AdminDashboardContent() {
     try {
       setLoading(true);
       
-      // Load basic dashboard stats
-      const dashboardResponse = await fetch(`${API_BASE_URL}/dashboard`, {
+      // Build query parameters for filtered dashboard data
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.assigned_user) params.append('assigned_user', filters.assigned_user);
+      if (filters.domain) params.append('domain', filters.domain);
+      if (filters.date_from) params.append('date_from', filters.date_from);
+      if (filters.date_to) params.append('date_to', filters.date_to);
+      
+      // Load filtered dashboard stats
+      const dashboardUrl = params.toString() 
+        ? `${API_BASE_URL}/dashboard?${params}` 
+        : `${API_BASE_URL}/dashboard`;
+      
+      const dashboardResponse = await fetch(dashboardUrl, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -231,7 +252,7 @@ function AdminDashboardContent() {
         pending_urls: dashboardData.system_stats.pending_content_items,
         in_progress_urls: dashboardData.system_stats.total_content_items - dashboardData.system_stats.pending_content_items - dashboardData.system_stats.completed_content_items,
         completed_urls: dashboardData.system_stats.completed_content_items,
-        failed_urls: 0, // Would need to be calculated from actual data
+        failed_urls: dashboardData.system_stats.failed_content_items || 0,
         completion_rate: dashboardData.system_stats.total_content_items > 0 
           ? (dashboardData.system_stats.completed_content_items / dashboardData.system_stats.total_content_items) * 100 
           : 0,
@@ -265,6 +286,32 @@ function AdminDashboardContent() {
     }
   };
 
+  const loadFilterOptions = async () => {
+    try {
+      // Load available labelers
+      const labelersResponse = await fetch(`${API_BASE_URL}/admin/available-labelers`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (labelersResponse.ok) {
+        const labelersData = await labelersResponse.json();
+        setAvailableLabelers(labelersData);
+      }
+
+      // Load available domains
+      const domainsResponse = await fetch(`${API_BASE_URL}/admin/available-domains`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (domainsResponse.ok) {
+        const domainsData = await domainsResponse.json();
+        setAvailableDomains(domainsData);
+      }
+    } catch (err) {
+      console.error('Error loading filter options:', err);
+    }
+  };
+
   const loadContentItems = async () => {
     try {
       setContentLoading(true);
@@ -278,6 +325,10 @@ function AdminDashboardContent() {
       if (filters.status) params.append('status', filters.status);
       if (filters.search) params.append('search', filters.search);
       if (filters.priority) params.append('priority', filters.priority);
+      if (filters.assigned_user) params.append('assigned_user', filters.assigned_user);
+      if (filters.domain) params.append('domain', filters.domain);
+      if (filters.date_from) params.append('date_from', filters.date_from);
+      if (filters.date_to) params.append('date_to', filters.date_to);
       
       const response = await fetch(`${API_BASE_URL}/content?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -324,6 +375,7 @@ function AdminDashboardContent() {
       search: '',
       priority: '',
       assigned_user: '',
+      domain: '',
       date_from: '',
       date_to: ''
     });
@@ -414,28 +466,38 @@ function AdminDashboardContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-4">
-                <StatsIcon />
+        {/* Dashboard Header with Filter Indicator */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
+            {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+              <div className="mt-2 flex items-center text-sm text-blue-600 dark:text-blue-400">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+                </svg>
+                <span className="font-medium">Dashboard showing filtered results</span>
+                <button 
+                  onClick={resetFilters}
+                  className="ml-2 text-xs underline hover:no-underline"
+                >
+                  Show all data
+                </button>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
-                <p className="text-slate-600 dark:text-slate-400">Comprehensive system monitoring and URL management</p>
-              </div>
-            </div>
+            )}
+          </div>
+          <div className="flex space-x-4">
             <Button
-              variant="outline"
-              onClick={() => {
-                loadDashboardData();
-                loadContentItems();
-              }}
-              className="flex items-center space-x-2"
+              onClick={() => setShowFilters(!showFilters)}
+              variant={showFilters ? "default" : "outline"}
+              className="flex items-center"
             >
-              <RefreshIcon />
-              <span>Refresh</span>
+              <FilterIcon className="mr-2" />
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+              {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-1">
+                  {[filters.status, filters.search, filters.priority, filters.assigned_user, filters.domain, filters.date_from, filters.date_to].filter(Boolean).length}
+                </span>
+              )}
             </Button>
           </div>
         </div>
@@ -455,34 +517,22 @@ function AdminDashboardContent() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total URLs</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Total URLs
+                      {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                        <span className="text-xs text-blue-500 ml-1">(filtered)</span>
+                      )}
+                    </p>
                     <p className="text-2xl font-semibold text-slate-900 dark:text-white">{contentStats.total_urls}</p>
                   </div>
                   <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <LinkIcon />
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  +{contentStats.urls_added_today} today
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Completion Rate</p>
-                    <p className="text-2xl font-semibold text-slate-900 dark:text-white">{contentStats.completion_rate.toFixed(1)}%</p>
-                  </div>
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                     </svg>
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  {contentStats.completed_urls} completed
+                  {contentStats.completion_rate.toFixed(1)}% completion rate
                 </div>
               </CardContent>
             </Card>
@@ -491,7 +541,36 @@ function AdminDashboardContent() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Pending</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Completed
+                      {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                        <span className="text-xs text-blue-500 ml-1">(filtered)</span>
+                      )}
+                    </p>
+                    <p className="text-2xl font-semibold text-slate-900 dark:text-white">{contentStats.completed_urls}</p>
+                  </div>
+                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  {contentStats.urls_completed_today} completed today
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Pending
+                      {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                        <span className="text-xs text-blue-500 ml-1">(filtered)</span>
+                      )}
+                    </p>
                     <p className="text-2xl font-semibold text-slate-900 dark:text-white">{contentStats.pending_urls}</p>
                   </div>
                   <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
@@ -526,21 +605,28 @@ function AdminDashboardContent() {
         )}
 
         {/* Enhanced Statistics Overview with Labeling Analytics */}
-        {contentStats && (
+        {labelingAnalytics && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total URLs</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Total URLs
+                      {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                        <span className="text-xs text-blue-500 ml-1">(filtered)</span>
+                      )}
+                    </p>
                     <p className="text-2xl font-semibold text-slate-900 dark:text-white">{contentStats.total_urls}</p>
                   </div>
                   <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <LinkIcon />
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  +{contentStats.urls_added_today} today
+                  {contentStats.urls_added_today} today
                 </div>
               </CardContent>
             </Card>
@@ -551,7 +637,7 @@ function AdminDashboardContent() {
                   <div>
                     <p className="text-sm font-medium text-slate-600 dark:text-slate-400">AI Generated</p>
                     <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
-                      {labelingAnalytics?.classification_distribution.ai_generated.count || 0}
+                      {labelingAnalytics.classification_distribution.ai_generated.count || 0}
                     </p>
                   </div>
                   <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
@@ -561,7 +647,7 @@ function AdminDashboardContent() {
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  {labelingAnalytics?.classification_distribution.ai_generated.percentage.toFixed(1) || 0}% of total
+                  {labelingAnalytics.classification_distribution.ai_generated.percentage.toFixed(1) || 0}% of total
                 </div>
               </CardContent>
             </Card>
@@ -572,7 +658,7 @@ function AdminDashboardContent() {
                   <div>
                     <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Human Created</p>
                     <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                      {labelingAnalytics?.classification_distribution.human_created.count || 0}
+                      {labelingAnalytics.classification_distribution.human_created.count || 0}
                     </p>
                   </div>
                   <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
@@ -582,7 +668,7 @@ function AdminDashboardContent() {
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  {labelingAnalytics?.classification_distribution.human_created.percentage.toFixed(1) || 0}% of total
+                  {labelingAnalytics.classification_distribution.human_created.percentage.toFixed(1) || 0}% of total
                 </div>
               </CardContent>
             </Card>
@@ -892,12 +978,131 @@ function AdminDashboardContent() {
                     </select>
                   </div>
                   
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assigned Labeler</label>
+                    <select
+                      value={filters.assigned_user}
+                      onChange={(e) => handleFilterChange('assigned_user', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    >
+                      <option value="">All Labelers</option>
+                      <option value="unassigned">Unassigned</option>
+                      {availableLabelers.map((labeler) => (
+                        <option key={labeler.id} value={labeler.id.toString()}>
+                          {labeler.full_name} (@{labeler.username})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Domain</label>
+                    <select
+                      value={filters.domain}
+                      onChange={(e) => handleFilterChange('domain', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    >
+                      <option value="">All Domains</option>
+                      {availableDomains.map((domain) => (
+                        <option key={domain} value={domain}>
+                          {domain}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">From Date</label>
+                    <Input
+                      type="date"
+                      value={filters.date_from}
+                      onChange={(e) => handleFilterChange('date_from', e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To Date</label>
+                    <Input
+                      type="date"
+                      value={filters.date_to}
+                      onChange={(e) => handleFilterChange('date_to', e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
                   <div className="flex items-end">
-                    <Button variant="outline" onClick={resetFilters} className="w-full">
+                    <Button
+                      onClick={resetFilters}
+                      variant="outline"
+                      className="w-full"
+                    >
                       Clear Filters
                     </Button>
                   </div>
                 </div>
+
+                {/* Filter Summary */}
+                {(filters.status || filters.search || filters.priority || filters.assigned_user || filters.domain || filters.date_from || filters.date_to) && (
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-300">Active Filters:</h4>
+                      <Button
+                        onClick={resetFilters}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {filters.status && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          Status: {filters.status}
+                          <button onClick={() => handleFilterChange('status', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.search && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          Search: "{filters.search}"
+                          <button onClick={() => handleFilterChange('search', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.priority && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          Priority: {filters.priority}
+                          <button onClick={() => handleFilterChange('priority', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.assigned_user && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          Labeler: {filters.assigned_user === 'unassigned' ? 'Unassigned' : 
+                            availableLabelers.find(l => l.id.toString() === filters.assigned_user)?.username || filters.assigned_user}
+                          <button onClick={() => handleFilterChange('assigned_user', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.domain && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          Domain: {filters.domain}
+                          <button onClick={() => handleFilterChange('domain', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.date_from && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          From: {filters.date_from}
+                          <button onClick={() => handleFilterChange('date_from', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                      {filters.date_to && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                          To: {filters.date_to}
+                          <button onClick={() => handleFilterChange('date_to', '')} className="ml-1 hover:text-blue-600">×</button>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
